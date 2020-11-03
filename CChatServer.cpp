@@ -1,11 +1,14 @@
 #include "CChatServer.h"
-#include "SystemLog.h"
+//#include "SystemLog.h"
 CChatServer::CChatServer() {
 	_hEvent = CreateEvent(NULL, FALSE, FALSE, NULL);
 	_hUpdateThread = (HANDLE)_beginthreadex(NULL, 0, UpdateThreadFunc, this, 0, NULL);
 	_dwHeartbeatTime = timeGetTime();
 	_HeartbeatDis = 0;
 	_MsgTPS = 0;
+	_SessionNotFound = 0;
+	_SessionMiss = 0;
+	_dwTokenTime = timeGetTime();
 }
 
 unsigned int WINAPI CChatServer::UpdateThread(LPVOID lParam) {
@@ -20,6 +23,8 @@ unsigned int WINAPI CChatServer::UpdateThread(LPVOID lParam) {
 					break;
 				/*if(timeGetTime() - _dwHeartbeatTime > 1000*10)
 					CheckHeartbeat();*/
+				/*if (timeGetTime() - _dwTokenTime > 1000 * 15)
+					CheckToken();*/
 				st_UPDATE_MSG* updateMsg;
 				_MsgQueue.Dequeue(&updateMsg);
 				_MsgTPS++;
@@ -90,7 +95,6 @@ void CChatServer::JoinMSG(INT64 SessionID) {
 	newPlayer->_SectorY = -1;
 	newPlayer->_LastMsg = 0;
 	newPlayer->_AccountNo = -1;
-	//InsertAcceptMap(SessionID, newPlayer);
 	InsertPlayerMap(newPlayer);
 }
 
@@ -128,10 +132,6 @@ void CChatServer::CheckHeartbeat() {
 		if (it->second->_dwRecvTime < _dwHeartbeatTime - 1000*10) {
 			//CCrashDump::Crash();
 			CPlayer* pPlayer = it->second;
-			/*if(pPlayer->_SectorX != -1 && pPlayer->_SectorY != -1)
-				Sector_RemovePlayer(it->second);
-			it = _PlayerMap.erase(it);
-			INT64 SessionID = pPlayer->_SessionID;
 			/*/
 			/*_LOG(L"HEARTBEAT", LEVEL_DEBUG, L"SessionID: %ld, AccountNo:%ld, RecvTime: %d\n", 
 				pPlayer->_SessionID, pPlayer->_AccountNo, pPlayer->_dwRecvTime);*/
@@ -144,6 +144,21 @@ void CChatServer::CheckHeartbeat() {
 	}
 }
 
+void CChatServer::CheckToken() {
+	_dwTokenTime = timeGetTime();
+	AcquireSRWLockExclusive(&CLoginClient::_srwTOKEN);
+	for (auto it = CLoginClient::_TokenMap.begin(); it != CLoginClient::_TokenMap.end();) {
+		if (it->second->UpdateTime < _dwTokenTime - 1000 * 15) {
+			CLoginClient::st_TOKEN* Token = it->second;
+			it = CLoginClient::_TokenMap.erase(it);
+			CLoginClient::_TokenPool.Free(Token);
+		}
+		else
+			it++;
+	}
+	ReleaseSRWLockExclusive(&CLoginClient::_srwTOKEN);
+}
+
 //Req function
 void CChatServer::ReqLogin(CPacket* pPacket, INT64 SessionID) {
 	CPlayer* pPlayer = FindPlayerMap(SessionID);
@@ -153,23 +168,49 @@ void CChatServer::ReqLogin(CPacket* pPacket, INT64 SessionID) {
 		SendPacket(SessionID, pSendPacket);
 		pSendPacket->Free();
 		Disconnect(SessionID);
-		//CCrashDump::Crash();
+		CCrashDump::Crash();
 	}
 	else {
 		if (pPacket->GetDataSize() != 152) {
 			Disconnect(SessionID);
 			return;
 		}
+		//TokenMap을 통해 해당 토큰이 유효한지 확인
+		bool bLogin = true;
 		*pPacket >> pPlayer->_AccountNo;
 		pPacket->GetData((char*)pPlayer->_ID, 40);
 		pPacket->GetData((char*)pPlayer->_Nickname, 40);
 		pPacket->GetData(pPlayer->_SessionKey, 64);
-		pPlayer->_dwRecvTime = timeGetTime();
-		pPlayer->_LastMsg = en_PACKET_CS_CHAT_RES_LOGIN;
-		CPacket* pSendPacket = CPacket::Alloc();
-		MPResLogin(pSendPacket, en_PACKET_CS_CHAT_RES_LOGIN, 1, pPlayer->_AccountNo);
-		SendPacket(SessionID, pSendPacket);
-		pSendPacket->Free();
+		//AcquireSRWLockExclusive(&CLoginClient::_srwTOKEN);
+		//auto it = CLoginClient::_TokenMap.find(pPlayer->_AccountNo);
+		////해당 account가 없는 경우
+		//if (it == CLoginClient::_TokenMap.end()) {
+		//	ReleaseSRWLockExclusive(&CLoginClient::_srwTOKEN);
+		//	_SessionNotFound++;
+		//	Disconnect(SessionID);
+		//	return;
+		//}
+		//else {
+		//	//토큰이 다른 경우
+		//	if (strcmp(it->second->Token, pPlayer->_SessionKey)!=0) {
+		//		_SessionMiss++;
+		//		Disconnect(SessionID);
+		//		bLogin = false;
+		//	}
+		//	//제대로 토큰을 뽑은 경우
+		//	CLoginClient::st_TOKEN* Token = it->second;
+		//	CLoginClient::_TokenMap.erase(it);
+		//	CLoginClient::_TokenPool.Free(Token);
+		//	ReleaseSRWLockExclusive(&CLoginClient::_srwTOKEN);
+		//}
+		if (bLogin) {
+			pPlayer->_dwRecvTime = timeGetTime();
+			pPlayer->_LastMsg = en_PACKET_CS_CHAT_RES_LOGIN;
+			CPacket* pSendPacket = CPacket::Alloc();
+			MPResLogin(pSendPacket, en_PACKET_CS_CHAT_RES_LOGIN, 1, pPlayer->_AccountNo);
+			SendPacket(SessionID, pSendPacket, NET, true);
+			pSendPacket->Free();
+		}
 	}
 	
 }
@@ -223,7 +264,7 @@ void CChatServer::ReqSectorMove(CPacket* pPacket, INT64 SessionID) {
 		}
 		CPacket* pSendPacket = CPacket::Alloc();
 		MPResSectorMove(pSendPacket, en_PACKET_CS_CHAT_RES_SECTOR_MOVE, AccountNo, SectorX, SectorY);
-		SendPacket(SessionID, pSendPacket);
+		SendPacket(SessionID, pSendPacket, NET, true);
 		pSendPacket->Free();
 	}
 }
@@ -321,28 +362,11 @@ void CChatServer::MPResMessage(CPacket* pPacket, WORD Type, INT64 AccountNo, WCH
 	pPacket->PutData((char*)Message, MessageLen);
 }
 
-//map function
-//void CChatServer::InsertAcceptMap(INT64 SessionID, CPlayer* pPlayer) {
-//	_AcceptMap.insert(make_pair(SessionID, pPlayer));
-//}
-//
-//CChatServer::CPlayer* CChatServer::FindAcceptMap(INT64 SessionID) {
-//	auto it = _PlayerMap.find(SessionID);
-//	if (it != _PlayerMap.end()) {
-//		return it->second;
-//	}
-//	else return NULL;
-//}
-//
-//void CChatServer::RemoveAcceptMap(CPlayer* pPlayer) {
-//	_AcceptMap.erase(pPlayer->_SessionID);
-//}
-
 void CChatServer::InsertPlayerMap(CPlayer* pPlayer) {
 	_PlayerMap.insert(make_pair(pPlayer->_SessionID, pPlayer));
 }
 
-CChatServer::CPlayer* CChatServer::FindPlayerMap(INT64 SessionID) {
+CPlayer* CChatServer::FindPlayerMap(INT64 SessionID) {
 	auto it = _PlayerMap.find(SessionID);
 	if (it != _PlayerMap.end()) {
 		return it->second;
@@ -376,7 +400,7 @@ bool CChatServer::Sector_RemovePlayer(CPlayer* pPlayer) {
 void CChatServer::SendPacketSector(CPacket* pPacket, WORD SectorX, WORD SectorY) {
 	auto IterEnd = _Sector[SectorY][SectorX].end();
 	for (auto it = _Sector[SectorY][SectorX].begin(); it != IterEnd;) {
-		SendPacket((*it)->_SessionID, pPacket);
+		SendPacket((*it)->_SessionID, pPacket, NET, true);
 		it++;
 	}
 }

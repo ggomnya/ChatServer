@@ -1,12 +1,10 @@
 #pragma once
 #include "CNetServer.h"
+#include "CLoginClient.h"
 #include "CommonProtocol_Login.h"
 #include <list>
 #include <unordered_map>
 using namespace std;
-
-extern SRWLOCK srwTOKEN;
-extern unordered_map<INT64, string> TokenMap;
 
 class CChatServer : public CNetServer {
 private:
@@ -14,44 +12,24 @@ private:
 #define dfPACKET	1
 #define dfLEAVE		2
 #define dfHEARTBEAT	40
-	struct st_UPDATE_MSG {
-		BYTE byType;
-		CPacket* pPacket;
-		INT64 SessionID;
-	};
-
-	class CPlayer {
-	public:
-		INT64 _SessionID;
-		INT64 _LastAccountNo;
-		INT64 _AccountNo;
-		WCHAR _ID[20];
-		WCHAR _Nickname[20];
-		char _SessionKey[64];
-		short _SectorX;
-		short _SectorY;
-		short _LastSectorX;
-		short _LastSectorY;
-		DWORD _dwRecvTime;
-		INT64 _LastSessionID;
-		BYTE _LastMsg;
-
-	};
 
 	DWORD _dwHeartbeatTime;
+	DWORD _dwTokenTime;
 	HANDLE _hUpdateThread;
 	HANDLE _hEvent;
 	CObjectPool<st_UPDATE_MSG> _UpdateMsgPool;
 	CLockfreeQueue<st_UPDATE_MSG*> _MsgQueue;
 	CObjectPool<CPlayer> _PlayerPool;
 	list<CPlayer*> _Sector[100][100];
-	//unordered_map<INT64, CPlayer*> _AcceptMap;
 	unordered_map<INT64, CPlayer*> _PlayerMap;
 
 public:
+	CLoginClient _LoginClient;
 	INT64 _HeartbeatDis;
 	INT64 _MsgTPS;
 	INT64 _BlockCount;
+	INT64 _SessionNotFound;
+	INT64 _SessionMiss;
 	CChatServer();
 	static unsigned int WINAPI UpdateThreadFunc(LPVOID lParam) {
 		((CChatServer*)lParam)->UpdateThread(lParam);
@@ -63,6 +41,7 @@ public:
 	void LeaveMSG(INT64 SessionID);
 
 	void CheckHeartbeat();
+	void CheckToken();
 
 	void ReqLogin(CPacket* pPacket, INT64 SessionID);
 	void ReqSectorMove(CPacket* pPacket, INT64 SessionID);
@@ -73,10 +52,6 @@ public:
 	void MPResSectorMove(CPacket* pPacket, WORD Type, INT64 AccountNo, WORD SectorX, WORD SectorY);
 	void MPResMessage(CPacket* pPacket, WORD Type, INT64 AccountNo, WCHAR* ID, WCHAR* Nickname,
 		WORD MessageLen, WCHAR* Message);
-
-	/*void InsertAcceptMap(INT64 SessionID, CPlayer* pPlayer);
-	CPlayer* FindAcceptMap(INT64 SessionID);
-	void RemoveAcceptMap(CPlayer* pPlayer);*/
 
 	void InsertPlayerMap(CPlayer* pPlayer);
 	CPlayer* FindPlayerMap(INT64 SessionID);

@@ -66,7 +66,11 @@ int CPacket::GetDataSize() {
 	return _iDataSize;
 }
 
-
+int CPacket::GetHeaderSize() {
+	if (_iHeader == 0)
+		return 5;
+	else return 2;
+}
 
 char* CPacket::GetHeaderPtr() {
 	return _Buffer + _iHeader;

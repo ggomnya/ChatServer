@@ -1,6 +1,11 @@
 #include "CLoginClient.h"
+SRWLOCK CLoginClient::_srwTOKEN;
+CObjectPool<CLoginClient::st_TOKEN>CLoginClient::_TokenPool;
+unordered_map<INT64, CLoginClient::st_TOKEN*>CLoginClient::_TokenMap;
 
-
+CLoginClient::CLoginClient() {
+	InitializeSRWLock(&_srwTOKEN);
+}
 
 void CLoginClient::MPLoginServerLogin(CPacket* pPacket, WORD Type, BYTE ServerType, WCHAR* ServerName) {
 	*pPacket << Type << ServerType;
@@ -9,6 +14,10 @@ void CLoginClient::MPLoginServerLogin(CPacket* pPacket, WORD Type, BYTE ServerTy
 
 void CLoginClient::MPResNewClientLogin(CPacket* pPacket, WORD Type, INT64 AccountNo, INT64 Parameter) {
 	*pPacket << Type << AccountNo << Parameter;
+}
+
+INT64 CLoginClient::GetTokenCount() {
+	return _TokenMap.size();
 }
 
 void CLoginClient::OnEnterJoinServer(INT64 SessionID) {
@@ -28,25 +37,27 @@ void CLoginClient::OnLeaveServer(INT64 SessionID) {
 void CLoginClient::OnRecv(INT64 SessionID, CPacket* pRecvPacket) {
 	WORD Type;
 	INT64 AccountNo;
-	char SessionKey[64];
 	INT64 Parameter;
 	*pRecvPacket >> Type >> AccountNo;
-	pRecvPacket->GetData(SessionKey, 64);
-	*pRecvPacket >> Parameter;
 
 	if (Type != en_PACKET_SS_REQ_NEW_CLIENT_LOGIN) {
 		CCrashDump::Crash();
 	}
-	AcquireSRWLockExclusive(&srwTOKEN);
-	auto it = TokenMap.find(AccountNo);
+	AcquireSRWLockExclusive(&_srwTOKEN);
+	auto it = _TokenMap.find(AccountNo);
 	//처음 온 Account인 경우
-	if (it == TokenMap.end()) {
-		TokenMap.insert(make_pair(AccountNo, SessionKey));
+	if (it == _TokenMap.end()) {
+		st_TOKEN* newToken = _TokenPool.Alloc();
+		pRecvPacket->GetData(newToken->Token, 64);
+		newToken->UpdateTime = timeGetTime();
+		_TokenMap.insert(make_pair(AccountNo, newToken));
 	}
 	else {
-		it->second = SessionKey;
+		pRecvPacket->GetData(it->second->Token, 64);
+		it->second->UpdateTime = timeGetTime();
 	}
-	ReleaseSRWLockExclusive(&srwTOKEN);
+	*pRecvPacket >> Parameter;
+	ReleaseSRWLockExclusive(&_srwTOKEN);
 	CPacket* pSendPacket = CPacket::Alloc();
 	MPResNewClientLogin(pSendPacket, en_PACKET_SS_RES_NEW_CLIENT_LOGIN, AccountNo, Parameter);
 	SendPacket(pSendPacket);
@@ -57,3 +68,4 @@ void CLoginClient::OnError(int errorcode, const WCHAR* Err) {
 	wprintf(L"errcode: %d, %s\n", errorcode, Err);
 	return;
 }
+

@@ -80,6 +80,7 @@ public:
 
 	int GetBufferSize();
 	int GetDataSize();
+	int GetHeaderSize();
 
 	char* GetBufferPtr();
 

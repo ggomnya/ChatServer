@@ -179,8 +179,8 @@ bool CLanClient::Connect() {
 		if (retval == 0) {
 			closesocket(_ClientSession.sock);
 			_ConnectFail++;
-			if (_ConnectFail >= 100)
-				return false;
+			/*if (_ConnectFail >= 100)
+				return false;*/
 		}
 		else {
 			_ConnectFail = 0;
@@ -196,7 +196,8 @@ bool CLanClient::Connect() {
 }
 
 void CLanClient::ReConnect() {
-	CreateIoCompletionPort((HANDLE)_ClientSession.sock, _hcp, (ULONG_PTR)&_ClientSession, 0);
+	PostQueuedCompletionStatus(_hcp, sizeof(stSESSION*), (ULONG_PTR)&_ClientSession, (WSAOVERLAPPED*)&_ClientSession.ConnectOverlapped);
+	//CreateIoCompletionPort((HANDLE)_ClientSession.sock, _hcp, (ULONG_PTR)&_ClientSession, 0);
 }
 
 bool CLanClient::_Disconnect(stSESSION* pSession) {
@@ -342,7 +343,7 @@ void CLanClient::SendPost(stSESSION* pSession) {
 	while (pSession->SendQ.Size() > 0) {
 		pSession->SendQ.Dequeue(&(pSession->PacketArray[i]));
 		sendbuf[i].buf = pSession->PacketArray[i]->GetHeaderPtr();
-		sendbuf[i].len = pSession->PacketArray[i]->GetDataSize() + HEADER;
+		sendbuf[i].len = pSession->PacketArray[i]->GetDataSize() + pSession->PacketArray[i]->GetHeaderSize();
 		pSession->PacketCount++;
 		i++;
 	}

@@ -13,6 +13,7 @@
 #include "LockfreeQueue.h"
 #include "RingBuffer_Lock.h"
 #include "CCrashDump.h"
+#include "CommonStruct.h"
 using namespace std;
 
 
@@ -22,7 +23,7 @@ using namespace std;
 class CLanClient {
 public:
 
-	enum { SEND, RECV, CONNECT };
+	/*enum { SEND, RECV, CONNECT };
 	struct stRELEASE {
 		LONG64 IOCount;
 		LONG64 ReleaseFlag;
@@ -54,7 +55,7 @@ public:
 		__declspec(align(16))
 			LONG64 IOCount;
 		LONG64 ReleaseFlag;
-	};
+	};*/
 
 private:
 #define HEADER	2

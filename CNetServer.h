@@ -15,75 +15,19 @@
 #include "LockfreeQueue.h"
 #include "RingBuffer_Lock.h"
 #include "CCrashDump.h"
+#include "CommonStruct.h"
+#include "LockfreeStack.h"
 using namespace std;
 
 
 
 class CNetServer {
 private:
-	enum { SEND, RECV, UPDATE };
-
-	struct stRELEASE {
-		LONG64 IOCount;
-		LONG64 ReleaseFlag;
-		stRELEASE() {
-			IOCount = 0;
-			ReleaseFlag = TRUE;
-		}
-	};
-
-	struct stOVERLAPPED {
-		WSAOVERLAPPED Overlapped;
-		INT64 SessionID;
-		int Type;
-	};
-
-	struct stSESSION {
-		SOCKET sock;
-		SOCKET closeSock;
-		INT64 SessionID;
-		INT64 SessionIndex;
-		SOCKADDR_IN clientaddr;
-		stOVERLAPPED SendOverlapped;
-		stOVERLAPPED RecvOverlapped;
-		stOVERLAPPED UpdateOverlapped;
-		CRingBuffer RecvQ;
-		CLockfreeQueue<CPacket*> SendQ;
-		volatile LONG SendFlag;
-		CPacket* PacketArray[200];
-		int PacketCount;
-		//여기부턴 debug용
-		int iSendbyte;
-		char pack[1024];
-		DWORD sendComtime;
-		DWORD recvComtime;
-		INT64 Dis;
-		DWORD recvret;
-		DWORD sendret;
-		DWORD sendtime;
-		DWORD recvtime;
-		DWORD sendTh;
-		DWORD recvTh;
-		DWORD DisTh;
-		DWORD ReleaseTh;
-		DWORD sendComTh;
-		DWORD recvComTh;
-		DWORD Distime;
-		DWORD DisIO;
-		SOCKET tempsock;
-		//list<int> rel;
-		__declspec(align(16))
-			LONG64 IOCount;
-		LONG64 ReleaseFlag;
-	};
-
-
-
 #define HEADER	5
-	SRWLOCK srwINDEX;
+	//SRWLOCK srwINDEX;
 	stSESSION* _SessionList;
-	stack<int> _IndexSession;
-	//queue<int> _IndexSession;
+	CLockfreeStack<int> _IndexSession;
+	//stack<int> _IndexSession;
 	INT64 _SessionIDCnt;
 	SOCKET _Listen_sock;
 	HANDLE _hcp;
@@ -120,14 +64,16 @@ public:
 	int GetClientCount();
 	bool _Disconnect(stSESSION* pSession);
 	bool Disconnect(INT64 SessionID);
-	bool _SendPacket(stSESSION* pSession, CPacket* pSendPacket);
-	bool SendPacket(INT64 SessionID, CPacket* pSendPacket);
+	bool _SendPacket(stSESSION* pSession, CPacket* pSendPacket, int type = NET);
+	bool SendPacket(INT64 SessionID, CPacket* pSendPacket, int type = NET, bool post = false);
 	stSESSION* FindSession(INT64 SessionID);
 	void ReleaseSession(stSESSION* pSession);
 
 	void RecvPost(stSESSION* pSession);
 	void SendPost(stSESSION* pSession);
 	void Release(stSESSION* pSession);
+
+	void DebugFunc(stSESSION* pSession, int FuncNum);
 
 
 	
