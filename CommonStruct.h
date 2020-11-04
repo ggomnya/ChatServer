@@ -10,6 +10,7 @@
 enum { SEND, RECV, UPDATE, CONNECT };
 enum { LAN, NET };
 enum { ACCEPT, RECVCOM, SENDCOM, UPDATECOM, PQCS, RECVPOST, SENDPOST, DIS, RELEASE};
+enum {LANHEADER = 2, NETHEADER = 5};
 #define DEBUGNUM	1
 struct stRELEASE {
 	LONG64 IOCount;
@@ -116,6 +117,11 @@ struct st_UPDATE_MSG {
 	BYTE byType;
 	CPacket* pPacket;
 	INT64 SessionID;
+};
+
+struct st_TOKEN {
+	char Token[64];
+	DWORD UpdateTime;
 };
 
 //LoginServer

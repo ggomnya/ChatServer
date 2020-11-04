@@ -19,6 +19,7 @@ unsigned int WINAPI CNetServer::WorkerThread(LPVOID lParam) {
 		stOVERLAPPED* Overlapped;
 		retval = GetQueuedCompletionStatus(_hcp, &cbTransferred, (PULONG_PTR)&pSession, (LPOVERLAPPED*)&Overlapped, INFINITE);
 		if (retval == false) {
+			if(GetLastError() != 64)
 			_LOG(L"GQCS", LEVEL_WARNING, L"SessionID: %ld, Overlapped Type:%ld, WSAGetLastError: %d\n",
 				pSession->SessionID, Overlapped->Type, GetLastError());
 		}
@@ -50,29 +51,29 @@ unsigned int WINAPI CNetServer::WorkerThread(LPVOID lParam) {
 				pSession->RecvQ.MoveRear(cbTransferred);
 				while (1) {
 					//헤더 사이즈 이상이 있는지 확인
-					if (pSession->RecvQ.GetUseSize() < HEADER)
+					if (pSession->RecvQ.GetUseSize() < NETHEADER)
 						break;
 					CPacket::stPACKET_HEADER stPacketHeader;
 					//데이터가 있는지 확인
-					pSession->RecvQ.Peek((char*)&stPacketHeader, HEADER);
+					pSession->RecvQ.Peek((char*)&stPacketHeader, NETHEADER);
 					//헤더 코드 검증
 					if (stPacketHeader.byCode != dfPACKET_CODE) {
 						_Disconnect(pSession);
 						
 						break;
 					}
-					if (stPacketHeader.shLen > dfMAX_PACKET_BUFFER_SIZE-5) {
+					if (stPacketHeader.shLen > dfMAX_PACKET_BUFFER_SIZE- NETHEADER) {
 						_Disconnect(pSession);
 					
 						break;
 					}
-					if (pSession->RecvQ.GetUseSize() < int(HEADER + stPacketHeader.shLen))
+					if (pSession->RecvQ.GetUseSize() < int(NETHEADER + stPacketHeader.shLen))
 						break;
 					//pSession->RecvQ.MoveFront(5);
 					CPacket* RecvPacket = CPacket::Alloc();
 					int retval = pSession->RecvQ.Dequeue(RecvPacket->GetBufferPtr(), stPacketHeader.shLen + 5);
 					RecvPacket->MoveWritePos(stPacketHeader.shLen);
-					if (retval < stPacketHeader.shLen + HEADER) {
+					if (retval < stPacketHeader.shLen + NETHEADER) {
 						_Disconnect(pSession);
 					
 						RecvPacket->Free();

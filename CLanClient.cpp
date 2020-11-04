@@ -28,7 +28,6 @@ unsigned int WINAPI CLanClient::WorkerThread(LPVOID lParam) {
 		//Recv, Send 동작
 		else {
 			//recv인 경우
-			//g_RecvCnt++;
 			if (Overlapped->Type == RECV) {
 				//데이터 받아서 SendQ에 넣은 후 Send하기
 				pSession->RecvQ.MoveRear(cbTransferred);
@@ -38,21 +37,20 @@ unsigned int WINAPI CLanClient::WorkerThread(LPVOID lParam) {
 						break;
 					WORD Header;
 					//데이터가 있는지 확인
-					pSession->RecvQ.Peek((char*)&Header, sizeof(Header));
-					if (pSession->RecvQ.GetUseSize() < sizeof(Header) + Header)
+					pSession->RecvQ.Peek((char*)&Header, LANHEADER);
+					if (pSession->RecvQ.GetUseSize() < LANHEADER + Header)
 						break;
 					//pSession->RecvQ.MoveFront(sizeof(Header));
 					CPacket* RecvPacket = CPacket::Alloc();
-					int retval = pSession->RecvQ.Dequeue(RecvPacket->GetBufferPtr() + 3, Header+ sizeof(Header));
+					int retval = pSession->RecvQ.Dequeue(RecvPacket->GetBufferPtr() + 3, Header+ LANHEADER);
 					RecvPacket->MoveWritePos(retval);
-					if (retval < Header + sizeof(Header)) {
+					if (retval < Header + LANHEADER) {
 						Disconnect(pSession->SessionID);
 						RecvPacket->Free();
 						break;
 					}
 					_RecvTPS++;
 					OnRecv(pSession->SessionID, RecvPacket);
-					//InterlockedIncrement(&pSession->_NewCount);
 					RecvPacket->Free();
 				}
 
@@ -64,16 +62,12 @@ unsigned int WINAPI CLanClient::WorkerThread(LPVOID lParam) {
 			else if(Overlapped->Type == SEND) {
 				for (int i = 0; i < pSession->PacketCount; i++) {
 					pSession->PacketArray[i]->Free();
-					//InterlockedIncrement(&pSession->_DeleteCount);
 				}
 				pSession->PacketCount = 0;
 				InterlockedExchange(&(pSession->SendFlag), TRUE);
 				if (pSession->SendQ.Size() > 0) {
 					SendPost(pSession);
 				}
-				//if (pSession->SendQ.GetUseSize() > 0) {
-				//	SendPost(pSession);
-				//}
 			}
 			else if (Overlapped->Type == CONNECT) {
 				//IOCount를 줄일 필요가 없다.
@@ -197,7 +191,6 @@ bool CLanClient::Connect() {
 
 void CLanClient::ReConnect() {
 	PostQueuedCompletionStatus(_hcp, sizeof(stSESSION*), (ULONG_PTR)&_ClientSession, (WSAOVERLAPPED*)&_ClientSession.ConnectOverlapped);
-	//CreateIoCompletionPort((HANDLE)_ClientSession.sock, _hcp, (ULONG_PTR)&_ClientSession, 0);
 }
 
 bool CLanClient::_Disconnect(stSESSION* pSession) {
@@ -206,11 +199,6 @@ bool CLanClient::_Disconnect(stSESSION* pSession) {
 	if (retval != INVALID_SOCKET) {
 		pSession->closeSock = retval;
 		CancelIoEx((HANDLE)pSession->closeSock, NULL);
-		/*LINGER optval;
-		optval.l_linger = 0;
-		optval.l_onoff = 1;
-		setsockopt(retval, SOL_SOCKET, SO_LINGER, (char*)&optval, sizeof(optval));
-		closesocket(retval);*/
 		InterlockedIncrement((LONG*)&_DisCount);
 		return true;
 	}
@@ -227,12 +215,6 @@ bool CLanClient::Disconnect(INT64 SessionID) {
 	if (retval != INVALID_SOCKET) {
 		pSession->closeSock = retval;
 		CancelIoEx((HANDLE)pSession->closeSock, NULL);
-		/*WCHAR szClientIP[16];
-		LINGER optval;
-		optval.l_linger = 0;
-		optval.l_onoff = 1;
-		setsockopt(retval, SOL_SOCKET, SO_LINGER, (char*)&optval, sizeof(optval));
-		closesocket(retval);*/
 		InterlockedIncrement((LONG*)&_DisCount);
 		ReleaseSession(pSession);
 		return true;
@@ -278,7 +260,6 @@ void CLanClient::Release(stSESSION* pSession) {
 		optval.l_onoff = 1;
 		setsockopt(pSession->closeSock, SOL_SOCKET, SO_LINGER, (char*)&optval, sizeof(optval));
 		closesocket(pSession->closeSock);
-		//_Disconnect(pSession);
 		OnLeaveServer(SessionID);
 	}
 	
@@ -347,8 +328,6 @@ void CLanClient::SendPost(stSESSION* pSession) {
 		pSession->PacketCount++;
 		i++;
 	}
-	//if (i > _SendCount)
-	//	_SendCount = i;
 	_SendTPS += i;
 	InterlockedIncrement64(&(pSession->IOCount));
 	retval = WSASend(pSession->sock, sendbuf, pSession->PacketCount, &sendbyte, lpFlags, (WSAOVERLAPPED*)&pSession->SendOverlapped, NULL);

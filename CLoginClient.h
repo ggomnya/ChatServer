@@ -9,10 +9,6 @@ using namespace std;
 class CLoginClient : public CLanClient {
 private:
 	friend class CChatServer;
-	struct st_TOKEN {
-		char Token[64];
-		DWORD UpdateTime;
-	};
 	static SRWLOCK _srwTOKEN;
 	static CObjectPool<st_TOKEN> _TokenPool;
 	static unordered_map<INT64, st_TOKEN*> _TokenMap;
@@ -23,6 +19,21 @@ public:
 	void MPResNewClientLogin(CPacket* pPacket, WORD Type, INT64 AccountNo, INT64 Parameter);
 	
 	INT64 GetTokenCount();
+
+	static void InsertToken(st_TOKEN* pToken, INT64 AccountNo) {
+		_TokenMap.insert(make_pair(AccountNo, pToken));
+	}
+	static st_TOKEN* FindToken(INT64 AccountNo) {
+		st_TOKEN* pToken = NULL;
+		auto it = _TokenMap.find(AccountNo);
+		if (it != _TokenMap.end()) {
+			pToken = it->second;
+		}
+		return pToken;
+	}
+	static void RemoveToken(INT64 AccountNo) {
+		_TokenMap.erase(AccountNo);
+	}
 	
 	virtual void OnEnterJoinServer(INT64 SessionID);
 	virtual void OnLeaveServer(INT64 SessionID);

@@ -23,7 +23,6 @@ using namespace std;
 
 class CNetServer {
 private:
-#define HEADER	5
 	//SRWLOCK srwINDEX;
 	stSESSION* _SessionList;
 	CLockfreeStack<int> _IndexSession;

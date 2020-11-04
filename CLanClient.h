@@ -21,44 +21,7 @@ using namespace std;
 
 
 class CLanClient {
-public:
-
-	/*enum { SEND, RECV, CONNECT };
-	struct stRELEASE {
-		LONG64 IOCount;
-		LONG64 ReleaseFlag;
-		stRELEASE() {
-			IOCount = 0;
-			ReleaseFlag = TRUE;
-		}
-	};
-
-	struct stOVERLAPPED {
-		WSAOVERLAPPED Overlapped;
-		int Type;
-	};
-
-	struct stSESSION {
-		SOCKET sock;
-		SOCKET closeSock;
-		INT64 SessionID;
-		INT64 SessionIndex;
-		SOCKADDR_IN serveraddr;
-		stOVERLAPPED SendOverlapped;
-		stOVERLAPPED RecvOverlapped;
-		stOVERLAPPED ConnectOverlapped;
-		CRingBuffer RecvQ;
-		CLockfreeQueue<CPacket*> SendQ;
-		volatile LONG SendFlag;
-		CPacket* PacketArray[200];
-		int PacketCount;
-		__declspec(align(16))
-			LONG64 IOCount;
-		LONG64 ReleaseFlag;
-	};*/
-
 private:
-#define HEADER	2
 	SRWLOCK srwINDEX;
 	stSESSION _ClientSession;
 	HANDLE _hcp;

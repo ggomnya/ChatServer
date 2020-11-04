@@ -1,7 +1,7 @@
 #include "CLoginClient.h"
 SRWLOCK CLoginClient::_srwTOKEN;
-CObjectPool<CLoginClient::st_TOKEN>CLoginClient::_TokenPool;
-unordered_map<INT64, CLoginClient::st_TOKEN*>CLoginClient::_TokenMap;
+CObjectPool<st_TOKEN>CLoginClient::_TokenPool;
+unordered_map<INT64, st_TOKEN*>CLoginClient::_TokenMap;
 
 CLoginClient::CLoginClient() {
 	InitializeSRWLock(&_srwTOKEN);
@@ -44,20 +44,20 @@ void CLoginClient::OnRecv(INT64 SessionID, CPacket* pRecvPacket) {
 		CCrashDump::Crash();
 	}
 	AcquireSRWLockExclusive(&_srwTOKEN);
-	auto it = _TokenMap.find(AccountNo);
+	st_TOKEN* pToken = FindToken(AccountNo);
 	//처음 온 Account인 경우
-	if (it == _TokenMap.end()) {
+	if (pToken == NULL) {
 		st_TOKEN* newToken = _TokenPool.Alloc();
 		pRecvPacket->GetData(newToken->Token, 64);
 		newToken->UpdateTime = timeGetTime();
-		_TokenMap.insert(make_pair(AccountNo, newToken));
+		InsertToken(newToken, AccountNo);
 	}
 	else {
-		pRecvPacket->GetData(it->second->Token, 64);
-		it->second->UpdateTime = timeGetTime();
+		pRecvPacket->GetData(pToken->Token, 64);
+		pToken->UpdateTime = timeGetTime();
 	}
-	*pRecvPacket >> Parameter;
 	ReleaseSRWLockExclusive(&_srwTOKEN);
+	*pRecvPacket >> Parameter;
 	CPacket* pSendPacket = CPacket::Alloc();
 	MPResNewClientLogin(pSendPacket, en_PACKET_SS_RES_NEW_CLIENT_LOGIN, AccountNo, Parameter);
 	SendPacket(pSendPacket);
