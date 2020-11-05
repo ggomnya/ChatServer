@@ -514,6 +514,8 @@ void CNetServer::SendPost(stSESSION* pSession) {
 	WSABUF sendbuf[200];
 	DWORD i = 0;
 	while (pSession->SendQ.Size() > 0) {
+		if (i >= 200)
+			break;
 		pSession->SendQ.Dequeue(&(pSession->PacketArray[i]));
 		sendbuf[i].buf = pSession->PacketArray[i]->GetHeaderPtr();
 		sendbuf[i].len = pSession->PacketArray[i]->GetDataSize() + pSession->PacketArray[i]->GetHeaderSize();

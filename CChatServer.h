@@ -1,7 +1,7 @@
 #pragma once
 #include "CNetServer.h"
 #include "CLoginClient.h"
-#include "CommonProtocol_Login.h"
+#include "CommonProtocol.h"
 #include <list>
 #include <unordered_map>
 using namespace std;

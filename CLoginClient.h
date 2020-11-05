@@ -1,10 +1,9 @@
 #pragma once
 #include "CLanClient.h"
 #include <unordered_map>
-#include "CommonProtocol_Login.h"
+#include "CommonProtocol.h"
 using namespace std;
 //key - AccountNo, value - ¿Œ¡ı Token
-
 
 class CLoginClient : public CLanClient {
 private:

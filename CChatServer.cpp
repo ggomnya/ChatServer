@@ -149,7 +149,7 @@ void CChatServer::CheckToken() {
 	AcquireSRWLockExclusive(&CLoginClient::_srwTOKEN);
 	for (auto it = CLoginClient::_TokenMap.begin(); it != CLoginClient::_TokenMap.end();) {
 		if (it->second->UpdateTime < _dwTokenTime - 1000 * 15) {
-			CLoginClient::st_TOKEN* Token = it->second;
+			st_TOKEN* Token = it->second;
 			it = CLoginClient::_TokenMap.erase(it);
 			CLoginClient::_TokenPool.Free(Token);
 		}
@@ -181,28 +181,27 @@ void CChatServer::ReqLogin(CPacket* pPacket, INT64 SessionID) {
 		pPacket->GetData((char*)pPlayer->_ID, 40);
 		pPacket->GetData((char*)pPlayer->_Nickname, 40);
 		pPacket->GetData(pPlayer->_SessionKey, 64);
-		//AcquireSRWLockExclusive(&CLoginClient::_srwTOKEN);
-		//auto it = CLoginClient::_TokenMap.find(pPlayer->_AccountNo);
-		////해당 account가 없는 경우
-		//if (it == CLoginClient::_TokenMap.end()) {
-		//	ReleaseSRWLockExclusive(&CLoginClient::_srwTOKEN);
-		//	_SessionNotFound++;
-		//	Disconnect(SessionID);
-		//	return;
-		//}
-		//else {
-		//	//토큰이 다른 경우
-		//	if (strcmp(it->second->Token, pPlayer->_SessionKey)!=0) {
-		//		_SessionMiss++;
-		//		Disconnect(SessionID);
-		//		bLogin = false;
-		//	}
-		//	//제대로 토큰을 뽑은 경우
-		//	CLoginClient::st_TOKEN* Token = it->second;
-		//	CLoginClient::_TokenMap.erase(it);
-		//	CLoginClient::_TokenPool.Free(Token);
-		//	ReleaseSRWLockExclusive(&CLoginClient::_srwTOKEN);
-		//}
+		AcquireSRWLockExclusive(&CLoginClient::_srwTOKEN);
+		st_TOKEN* pToken = CLoginClient::FindToken(pPlayer->_AccountNo);
+		//해당 account가 없는 경우
+		if (pToken == NULL) {
+			ReleaseSRWLockExclusive(&CLoginClient::_srwTOKEN);
+			_SessionNotFound++;
+			Disconnect(SessionID);
+			return;
+		}
+		else {
+			//토큰이 다른 경우
+			if (memcmp((char*)pToken->Token, (char*)pPlayer->_SessionKey, 64)!=0) {
+				_SessionMiss++;
+				Disconnect(SessionID);
+				bLogin = false;
+			}
+			//제대로 토큰을 뽑은 경우
+			CLoginClient::_TokenMap.erase(pPlayer->_AccountNo);
+			ReleaseSRWLockExclusive(&CLoginClient::_srwTOKEN);
+			CLoginClient::_TokenPool.Free(pToken);
+		}
 		if (bLogin) {
 			pPlayer->_dwRecvTime = timeGetTime();
 			pPlayer->_LastMsg = en_PACKET_CS_CHAT_RES_LOGIN;
