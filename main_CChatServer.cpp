@@ -60,7 +60,7 @@ int wmain() {
 			wprintf(L"[SessionNotFound: %lld]\n", server->_SessionNotFound);
 			wprintf(L"[SessionMiss: %lld]\n", server->_SessionMiss);
 			wprintf(L"[Heartbeat Disconnect: %lld]\n", server->_HeartbeatDis);
-			wprintf(L"================LoginLanClient================\n");
+			wprintf(L"================ChatLanClient================\n");
 			wprintf(L"[TokenCount: %lld]\n", server->_LoginClient.GetTokenCount());
 			wprintf(L"[Lan Send TPS: %d]\n", server->_LoginClient._SendTPS);
 			wprintf(L"[Lan Recv TPS: %d]\n", server->_LoginClient._RecvTPS);
