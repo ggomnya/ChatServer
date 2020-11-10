@@ -3,6 +3,8 @@ SRWLOCK CLoginClient::_srwTOKEN;
 CObjectPool<st_TOKEN>CLoginClient::_TokenPool;
 unordered_map<INT64, st_TOKEN*>CLoginClient::_TokenMap;
 
+extern INT64 PacketNum;
+
 CLoginClient::CLoginClient() {
 	InitializeSRWLock(&_srwTOKEN);
 }
@@ -23,11 +25,13 @@ INT64 CLoginClient::GetTokenCount() {
 void CLoginClient::OnEnterJoinServer(INT64 SessionID) {
 	//서버에 내 IP와 TYPE 보내기
 	CPacket* pSendPacket = CPacket::Alloc();
+	//InterlockedIncrement64(&PacketNum);
 	WCHAR ServerName[32];
 	swprintf_s(ServerName, L"ChatServer");
 	MPLoginServerLogin(pSendPacket, en_PACKET_SS_LOGINSERVER_LOGIN, dfSERVER_TYPE_CHAT, ServerName);
 	SendPacket(pSendPacket);
 	pSendPacket->Free();
+	//InterlockedDecrement64(&PacketNum);
 }
 
 void CLoginClient::OnLeaveServer(INT64 SessionID) {
@@ -59,9 +63,11 @@ void CLoginClient::OnRecv(INT64 SessionID, CPacket* pRecvPacket) {
 	ReleaseSRWLockExclusive(&_srwTOKEN);
 	*pRecvPacket >> Parameter;
 	CPacket* pSendPacket = CPacket::Alloc();
+	//InterlockedIncrement64(&PacketNum);
 	MPResNewClientLogin(pSendPacket, en_PACKET_SS_RES_NEW_CLIENT_LOGIN, AccountNo, Parameter);
 	SendPacket(pSendPacket);
 	pSendPacket->Free();
+	//InterlockedDecrement64(&PacketNum);
 }
 
 void CLoginClient::OnError(int errorcode, const WCHAR* Err) {

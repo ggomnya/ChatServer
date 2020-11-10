@@ -1,15 +1,19 @@
 #include "PacketBuffer.h"
 
+
+
 TLS_CObjectPool<CPacket>* CPacket::_ObjectPool = NULL;
 
 void CPacket::Free() {
 	int retval = InterlockedDecrement(&_RefCount);
+	//InterlockedDecrement64(&PacketNum);
 	if (retval == 0) {
 		_ObjectPool->Free(this);
 	}
 }
 
 void CPacket::AddRef() {
+	//InterlockedIncrement64(&PacketNum);
 	InterlockedIncrement(&_RefCount);
 }
 

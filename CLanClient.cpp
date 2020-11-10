@@ -1,5 +1,6 @@
 #include "CLanClient.h"
 
+extern INT64 PacketNum;
 
 CLanClient::CLanClient() {
 	_SendTPS = 0;
@@ -42,6 +43,8 @@ unsigned int WINAPI CLanClient::WorkerThread(LPVOID lParam) {
 						break;
 					//pSession->RecvQ.MoveFront(sizeof(Header));
 					CPacket* RecvPacket = CPacket::Alloc();
+					//InterlockedIncrement64(&PacketNum);
+
 					int retval = pSession->RecvQ.Dequeue(RecvPacket->GetBufferPtr() + 3, Header+ LANHEADER);
 					RecvPacket->MoveWritePos(retval);
 					if (retval < Header + LANHEADER) {
@@ -52,6 +55,7 @@ unsigned int WINAPI CLanClient::WorkerThread(LPVOID lParam) {
 					_RecvTPS++;
 					OnRecv(pSession->SessionID, RecvPacket);
 					RecvPacket->Free();
+					//InterlockedDecrement64(&PacketNum);
 				}
 
 				//Recv 요청하기
@@ -62,6 +66,7 @@ unsigned int WINAPI CLanClient::WorkerThread(LPVOID lParam) {
 			else if(Overlapped->Type == SEND) {
 				for (int i = 0; i < pSession->PacketCount; i++) {
 					pSession->PacketArray[i]->Free();
+					//InterlockedDecrement64(&PacketNum);
 				}
 				pSession->PacketCount = 0;
 				InterlockedExchange(&(pSession->SendFlag), TRUE);
@@ -225,6 +230,7 @@ bool CLanClient::Disconnect(INT64 SessionID) {
 
 bool CLanClient::SendPacket(CPacket* pSendPacket) {
 	InterlockedIncrement64(&_ClientSession.IOCount);
+	//InterlockedIncrement64(&PacketNum);
 	pSendPacket->AddRef();
 	pSendPacket->SetHeader_2();
 	_ClientSession.SendQ.Enqueue(pSendPacket);
@@ -246,14 +252,19 @@ void CLanClient::Release(stSESSION* pSession) {
 	INT64 SessionID = pSession->SessionID;
 	if (InterlockedCompareExchange128(&pSession->IOCount, (LONG64)FALSE, (LONG64)0, (LONG64*)&temp)) {
 		pSession->SessionID = -1;
-		while (pSession->SendQ.Size() > 0) {
-			pSession->SendQ.Dequeue(&(pSession->PacketArray[pSession->PacketCount]));
-			if (pSession->PacketArray[pSession->PacketCount] != NULL)
-				pSession->PacketCount++;
-		}
-		for (int j = 0; j < pSession->PacketCount; j++) {
-			pSession->PacketArray[j]->Free();
-			
+		while (pSession->SendQ.Size() > 0 || pSession->PacketCount > 0) {
+			while (pSession->SendQ.Size() > 0) {
+				if (pSession->PacketCount >= dfPACKETNUM)
+					break;
+				pSession->SendQ.Dequeue(&(pSession->PacketArray[pSession->PacketCount]));
+				if (pSession->PacketArray[pSession->PacketCount] != NULL)
+					pSession->PacketCount++;
+			}
+			for (int j = 0; j < pSession->PacketCount; j++) {
+				pSession->PacketArray[j]->Free();
+				//InterlockedDecrement64(&PacketNum);
+			}
+			pSession->PacketCount = 0;
 		}
 		LINGER optval;
 		optval.l_linger = 0;
@@ -319,10 +330,10 @@ void CLanClient::SendPost(stSESSION* pSession) {
 	memset(&pSession->SendOverlapped, 0, sizeof(pSession->SendOverlapped.Overlapped));
 	DWORD sendbyte = 0;
 	DWORD lpFlags = 0;
-	WSABUF sendbuf[200];
+	WSABUF sendbuf[dfPACKETNUM];
 	DWORD i = 0;
 	while (pSession->SendQ.Size() > 0) {
-		if (i >= 200)
+		if (i >= dfPACKETNUM)
 			break;
 		pSession->SendQ.Dequeue(&(pSession->PacketArray[i]));
 		sendbuf[i].buf = pSession->PacketArray[i]->GetHeaderPtr();

@@ -18,6 +18,8 @@ USHORT ClientPort;
 DWORD ClientThreadNum;
 DWORD ClientIOCPNum;
 
+INT64 PacketNum;
+
 int wmain() {
 	timeBeginPeriod(1);
 	//Config ¼¼ÆÃ
@@ -66,7 +68,8 @@ int wmain() {
 			wprintf(L"[Lan Recv TPS: %d]\n", server->_LoginClient._RecvTPS);
 			wprintf(L"[Lan Connnect Sucess Count: %d]\n", server->_LoginClient._ConnectSuccess);
 			wprintf(L"[Lan Connect Fail Count: %d]\n", server->_LoginClient._ConnectFail);
-			wprintf(L"[Lan Disconnect Count: %d]\n\n", server->_LoginClient._DisCount);
+			wprintf(L"[Lan Disconnect Count: %d]\n", server->_LoginClient._DisCount);
+			wprintf(L"[PacketNum: %lld]\n\n", PacketNum);
 			ProcessUsage.UpdateProcessTime();
 			ProcessUsage.PrintProcessInfo();
 			wprintf(L"\n\n");
