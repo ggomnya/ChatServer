@@ -20,9 +20,10 @@ unsigned int WINAPI CNetServer::WorkerThread(LPVOID lParam) {
 		stOVERLAPPED* Overlapped;
 		retval = GetQueuedCompletionStatus(_hcp, &cbTransferred, (PULONG_PTR)&pSession, (LPOVERLAPPED*)&Overlapped, INFINITE);
 		if (retval == false) {
-			if(GetLastError() != 64)
-			_LOG(L"GQCS", LEVEL_WARNING, L"SessionID: %ld, Overlapped Type:%ld, WSAGetLastError: %d\n",
-				pSession->SessionID, Overlapped->Type, GetLastError());
+			DWORD dwError = GetLastError();
+			if (dwError != 64)
+				Log(L"GQCS_CHAT", LEVEL_WARNING, (WCHAR*)L"SessionID: %lld, Overlapped Type: %d, Overlapped Error:%lld, WSAGetLastError: %d\n", 
+					pSession->SessionID, Overlapped->Type, Overlapped->Overlapped.Internal, dwError);
 		}
 		//종료 처리
 		if (Overlapped == NULL) {
@@ -34,6 +35,7 @@ unsigned int WINAPI CNetServer::WorkerThread(LPVOID lParam) {
 		//연결 끊기
 		if (cbTransferred == 0) {
 			//CCrashDump::Crash();
+			DebugFunc(pSession, GQCS);
 			_Disconnect(pSession);
 		}
 		//Recv, Send 동작
@@ -156,7 +158,8 @@ unsigned int WINAPI CNetServer::AcceptThread(LPVOID lParam) {
 		}
 		
 		int curIdx;
-		_IndexSession.Pop(&curIdx);
+		//_IndexSession.Pop(&curIdx);
+		_IndexSession.Dequeue(&curIdx);
 		_SessionList[curIdx].sock = client_sock;
 		_SessionList[curIdx].clientaddr = clientaddr;
 		_SessionList[curIdx].SessionID = ++_SessionIDCnt;
@@ -206,6 +209,8 @@ unsigned int WINAPI CNetServer::AcceptThread(LPVOID lParam) {
 		_SessionList[curIdx].sendErr = 0;
 		_SessionList[curIdx].recvErr = 0;
 		_SessionList[curIdx].PQCSCnt = 0;
+		_SessionList[curIdx].recvLen[0] = 0;
+		_SessionList[curIdx].recvLen[1] = 0;
 		_SessionList[curIdx].debugCnt = 0;
 		DebugFunc(&_SessionList[curIdx], ACCEPT);
 		//log
@@ -248,7 +253,8 @@ bool CNetServer::Start(ULONG OpenIP, USHORT Port, int NumWorkerthread, int NumIO
 		}
 
 		for (int i = _MaxSession - 1; i >= 0; i--)
-			_IndexSession.Push(i);
+			_IndexSession.Enqueue(i);
+			//_IndexSession.Push(i);
 
 		//PacketBuffer 초기화
 		CPacket::Initial(iBlockNum, bPlacementNew);
@@ -275,7 +281,7 @@ bool CNetServer::Start(ULONG OpenIP, USHORT Port, int NumWorkerthread, int NumIO
 		return false;
 	}
 
-	retval = listen(_Listen_sock, SOMAXCONN);
+	retval = listen(_Listen_sock, SOMAXCONN_HINT(2048));
 	if (retval == SOCKET_ERROR) {
 		wprintf(L"listen() %d\n", WSAGetLastError()); 
 	}
@@ -321,6 +327,7 @@ bool CNetServer::_Disconnect(stSESSION* pSession) {
 
 
 bool CNetServer::Disconnect(INT64 SessionID) {
+	CCrashDump::Crash();
 	stSESSION* pSession = FindSession(SessionID);
 	if (pSession == NULL)
 		return false;
@@ -413,6 +420,9 @@ void CNetServer::ReleaseSession(stSESSION* pSession) {
 		if (pSession->ReleaseFlag == TRUE)
 			Release(pSession);
 	}
+	else if (retval < 0) {
+		CCrashDump::Crash();
+	}
 }
 
 void CNetServer::Release(stSESSION* pSession) {
@@ -441,7 +451,8 @@ void CNetServer::Release(stSESSION* pSession) {
 		optval.l_onoff = 1;
 		setsockopt(pSession->closeSock, SOL_SOCKET, SO_LINGER, (char*)&optval, sizeof(optval));
 		closesocket(pSession->closeSock);
-		_IndexSession.Push(pSession->SessionIndex);
+		_IndexSession.Enqueue(pSession->SessionIndex);
+		//_IndexSession.Push(pSession->SessionIndex);
 		OnClientLeave(SessionID);
 		//log
 		pSession->ReleaseTh = GetCurrentThreadId();
@@ -461,6 +472,8 @@ void CNetServer::RecvPost(stSESSION* pSession) {
 		recvbuf[0].len = pSession->RecvQ.DirectEnqueueSize();
 		recvbuf[1].buf = pSession->RecvQ.GetBufferPtr();
 		recvbuf[1].len = pSession->RecvQ.GetFreeSize() - pSession->RecvQ.DirectEnqueueSize();
+		pSession->recvLen[0] = recvbuf[0].len;
+		pSession->recvLen[1] = recvbuf[1].len;
 		InterlockedIncrement64(&(pSession->IOCount));
 		pSession->recvsock = pSession->sock;
 		int retval = WSARecv(pSession->sock, recvbuf, 2, &recvbyte, &lpFlags, (WSAOVERLAPPED*)&pSession->RecvOverlapped, NULL);
@@ -480,6 +493,7 @@ void CNetServer::RecvPost(stSESSION* pSession) {
 		WSABUF recvbuf;
 		recvbuf.buf = pSession->RecvQ.GetRearBufferPtr();
 		recvbuf.len = pSession->RecvQ.DirectEnqueueSize();
+		pSession->recvLen[0] = recvbuf.len;
 		InterlockedIncrement64(&(pSession->IOCount));
 		pSession->recvsock = pSession->sock;
 		int retval = WSARecv(pSession->sock, &recvbuf, 1, &recvbyte, &lpFlags, (WSAOVERLAPPED*)&pSession->RecvOverlapped, NULL);
@@ -547,7 +561,7 @@ void CNetServer::SendPost(stSESSION* pSession) {
 }
 
 void CNetServer::DebugFunc(stSESSION* pSession, int FuncNum) {
-	return;
+	//return;
 	int idx = InterlockedIncrement(&pSession->debugCnt);
 	idx %= DEBUGNUM;
 	pSession->debug[idx].FuncNum = FuncNum;

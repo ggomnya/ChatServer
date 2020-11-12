@@ -95,6 +95,8 @@ void CChatServer::JoinMSG(INT64 SessionID) {
 	newPlayer->_SectorY = -1;
 	newPlayer->_LastMsg = 0;
 	newPlayer->_AccountNo = -1;
+	newPlayer->_MSGLen = 0;
+	memset((char*)newPlayer->_MSG, 0, 2048);
 	InsertPlayerMap(newPlayer);
 }
 
@@ -119,6 +121,10 @@ void CChatServer::LeaveMSG(INT64 SessionID) {
 				return;
 			}
 			RemovePlayerMap(pPlayer);
+		}
+		//더미가 먼저 끊었는지 확인하기
+		if (memcmp((char*)pPlayer->_MSG, L"=", pPlayer->_MSGLen) != 0) {
+			CCrashDump::Crash();
 		}
 		_PlayerPool.Free(pPlayer);
 	}
@@ -303,6 +309,8 @@ void CChatServer::ReqMessage(CPacket* pPacket, INT64 SessionID) {
 				return;
 			}
 			pPacket->GetData((char*)Message, MessageLen);
+			memcpy((char*)pPlayer->_MSG, Message, MessageLen);
+			pPlayer->_MSGLen = MessageLen;
 			//자신 주변 9개 섹터에 메세지 보내기
 			CPacket* pSendPacket = CPacket::Alloc();
 			MPResMessage(pSendPacket, en_PACKET_CS_CHAT_RES_MESSAGE, AccountNo, pPlayer->_ID,

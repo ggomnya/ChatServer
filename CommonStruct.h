@@ -9,9 +9,9 @@
 
 enum { SEND, RECV, UPDATE, CONNECT };
 enum { LAN, NET };
-enum { ACCEPT, RECVCOM, SENDCOM, UPDATECOM, PQCS, RECVPOST, SENDPOST, DIS, RELEASE};
+enum { ACCEPT, RECVCOM, SENDCOM, UPDATECOM, PQCS, RECVPOST, SENDPOST, DIS, RELEASE, GQCS};
 enum {LANHEADER = 2, NETHEADER = 5};
-#define DEBUGNUM	1
+#define DEBUGNUM	200
 #define dfPACKETNUM	200
 struct stRELEASE {
 	LONG64 IOCount;
@@ -88,6 +88,7 @@ struct stSESSION {
 	SOCKET recvsock;
 	DWORD sendErr;
 	DWORD recvErr;
+	DWORD recvLen[2];
 	DWORD debugCnt;
 	stDEBUG debug[DEBUGNUM];
 	__declspec(align(64))
@@ -111,6 +112,8 @@ public:
 	DWORD _dwRecvTime;
 	INT64 _LastSessionID;
 	BYTE _LastMsg;
+	WCHAR _MSG[1024];
+	WORD _MSGLen;
 
 };
 

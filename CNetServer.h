@@ -25,7 +25,8 @@ class CNetServer {
 private:
 	//SRWLOCK srwINDEX;
 	stSESSION* _SessionList;
-	CLockfreeStack<int> _IndexSession;
+	//CLockfreeStack<int> _IndexSession;
+	CLockfreeQueue<int> _IndexSession;
 	//stack<int> _IndexSession;
 	INT64 _SessionIDCnt;
 	SOCKET _Listen_sock;
