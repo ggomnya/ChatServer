@@ -40,8 +40,8 @@ private:
 public:
 	int _AcceptCount;
 	int _AcceptTPS;
-	int _SendTPS;
-	int _RecvTPS;
+	volatile LONG _SendTPS;
+	volatile DWORD _RecvTPS;
 	int _DisCount;
 
 	CNetServer();

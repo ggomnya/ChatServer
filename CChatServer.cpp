@@ -123,9 +123,9 @@ void CChatServer::LeaveMSG(INT64 SessionID) {
 			RemovePlayerMap(pPlayer);
 		}
 		//더미가 먼저 끊었는지 확인하기
-		if (memcmp((char*)pPlayer->_MSG, L"=", pPlayer->_MSGLen) != 0) {
+		/*if (memcmp((char*)pPlayer->_MSG, L"=", pPlayer->_MSGLen) != 0) {
 			CCrashDump::Crash();
-		}
+		}*/
 		_PlayerPool.Free(pPlayer);
 	}
 

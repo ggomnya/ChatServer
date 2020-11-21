@@ -91,7 +91,7 @@ unsigned int WINAPI CNetServer::WorkerThread(LPVOID lParam) {
 						RecvPacket->Free();
 						break;
 					}
-					_RecvTPS++;
+					InterlockedIncrement(&_RecvTPS);
 					OnRecv(pSession->SessionID, RecvPacket);
 					RecvPacket->Free();
 				}
@@ -327,7 +327,7 @@ bool CNetServer::_Disconnect(stSESSION* pSession) {
 
 
 bool CNetServer::Disconnect(INT64 SessionID) {
-	CCrashDump::Crash();
+	//CCrashDump::Crash();
 	stSESSION* pSession = FindSession(SessionID);
 	if (pSession == NULL)
 		return false;
@@ -541,7 +541,7 @@ void CNetServer::SendPost(stSESSION* pSession) {
 		pSession->PacketCount++;
 		i++;
 	}
-	_SendTPS += i;
+	InterlockedAdd(&_SendTPS, i);
 	InterlockedIncrement64(&(pSession->IOCount));
 	pSession->sendsock = pSession->sock;
 	retval = WSASend(pSession->sock, sendbuf, pSession->PacketCount, &sendbyte, lpFlags, (WSAOVERLAPPED*)&pSession->SendOverlapped, NULL);
@@ -561,7 +561,7 @@ void CNetServer::SendPost(stSESSION* pSession) {
 }
 
 void CNetServer::DebugFunc(stSESSION* pSession, int FuncNum) {
-	//return;
+	return;
 	int idx = InterlockedIncrement(&pSession->debugCnt);
 	idx %= DEBUGNUM;
 	pSession->debug[idx].FuncNum = FuncNum;
