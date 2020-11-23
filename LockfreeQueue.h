@@ -55,10 +55,13 @@ public:
 		st_NODE* newNode = _Objectpool->Alloc();
 		newNode->_Data = Data;
 		newNode->Next = NULL;
+		st_DUMMY_NODE tail;
+		st_NODE* pNextNode;
+		LONG64 Counter;
 		while (1) {
-			st_DUMMY_NODE tail = _tail;
-			st_NODE* pNextNode = tail.pNode->Next;
-			LONG64 Counter = tail.Counter + 1;
+			tail = _tail;
+			pNextNode = tail.pNode->Next;
+			Counter = tail.Counter + 1;
 			/*st_STACK temp;
 			temp.ptr = (LONG64)newNode;
 			temp.Info = 1;
@@ -84,16 +87,19 @@ public:
 			InterlockedIncrement64(&_lSize);
 			return;
 		}*/
-
+		st_DUMMY_NODE head;
+		st_NODE* pNewHead;
+		LONG64 Counter;
+		st_DUMMY_NODE tail;
 		while (1) {
-			st_DUMMY_NODE head = _head;
-			st_NODE* pNewHead = head.pNode->Next;
+			head = _head;
+			pNewHead = head.pNode->Next;
 			if (pNewHead == NULL) {
 				Data = NULL;
 				return;
 			}
 
-			LONG64 Counter = head.Counter + 1;
+			Counter = head.Counter + 1;
 			*Data = pNewHead->_Data;
 			/*st_STACK temp;
 			temp.ptr = (LONG64)pNewHead;
@@ -102,7 +108,7 @@ public:
 			if (InterlockedCompareExchange128((LONG64*)&_head.pNode, (LONG64)Counter, (LONG64)pNewHead, (LONG64*)&head.pNode)) {
 				//_Stack.Push(temp);
 				//head에서 tail을 앞지르는 상황 만들지 않기
-				st_DUMMY_NODE tail = _tail;
+				tail = _tail;
 				Counter = tail.Counter + 1;
 				if (head.pNode == tail.pNode) {
 					InterlockedCompareExchange128((LONG64*)&_tail.pNode, (LONG64)Counter, (LONG64)head.pNode->Next, (LONG64*)&tail.pNode);

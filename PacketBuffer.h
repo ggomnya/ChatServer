@@ -30,6 +30,7 @@ protected:
 	LONG _RefCount;
 	bool _bEncodeFlag;
 	bool _bHeaderFlag;
+	int _CheckSum;
 	int _iHeader;
 	static TLS_CObjectPool<CPacket>* _ObjectPool;
 

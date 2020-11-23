@@ -8,7 +8,7 @@
 #include "PacketBuffer.h"
 
 enum { SEND, RECV, UPDATE, CONNECT };
-enum { LAN, NET };
+enum { eLAN, eNET };
 enum { ACCEPT, RECVCOM, SENDCOM, UPDATECOM, PQCS, RECVPOST, SENDPOST, DIS, RELEASE, GQCS};
 enum {LANHEADER = 2, NETHEADER = 5};
 
@@ -61,7 +61,7 @@ struct stSESSION {
 	CPacket* PacketArray[200];
 	int PacketCount;
 	//여기부턴 debug용
-	int iSendbyte;
+	/*int iSendbyte;
 	DWORD iRecvbyte;
 	DWORD sendComtime;
 	DWORD recvComtime;
@@ -91,7 +91,7 @@ struct stSESSION {
 	DWORD recvErr;
 	DWORD recvLen[2];
 	DWORD debugCnt;
-	stDEBUG debug[DEBUGNUM];
+	stDEBUG debug[DEBUGNUM];*/
 	__declspec(align(64))
 		LONG64 IOCount;
 	LONG64 ReleaseFlag;
@@ -101,20 +101,20 @@ struct stSESSION {
 struct CPlayer {
 public:
 	INT64 _SessionID;
-	INT64 _LastAccountNo;
+	//INT64 _LastAccountNo;
 	INT64 _AccountNo;
 	WCHAR _ID[20];
 	WCHAR _Nickname[20];
 	char _SessionKey[64];
 	short _SectorX;
 	short _SectorY;
-	short _LastSectorX;
-	short _LastSectorY;
+	//short _LastSectorX;
+	//short _LastSectorY;
 	DWORD _dwRecvTime;
-	INT64 _LastSessionID;
-	BYTE _LastMsg;
-	WCHAR _MSG[1024];
-	WORD _MSGLen;
+	//INT64 _LastSessionID;
+	//BYTE _LastMsg;
+	//WCHAR _MSG[1024];
+	//WORD _MSGLen;
 
 };
 

@@ -14,6 +14,7 @@ CChatServer::CChatServer() {
 unsigned int WINAPI CChatServer::UpdateThread(LPVOID lParam) {
 	/*SYSLOG_DIRECTORY(L"Log_Heartbeat");
 	SYSLOG_LEVEL(LEVEL_DEBUG);*/
+	st_UPDATE_MSG* updateMsg;
 	while (1) {
 		int retval = WaitForSingleObject(_hEvent, 1000*10);
 		//_BlockCount++;
@@ -25,7 +26,6 @@ unsigned int WINAPI CChatServer::UpdateThread(LPVOID lParam) {
 					CheckHeartbeat();*/
 				/*if (timeGetTime() - _dwTokenTime > 1000 * 15)
 					CheckToken();*/
-				st_UPDATE_MSG* updateMsg;
 				_MsgQueue.Dequeue(&updateMsg);
 				_MsgTPS++;
 				switch (updateMsg->byType) {
@@ -85,18 +85,18 @@ unsigned int WINAPI CChatServer::UpdateThread(LPVOID lParam) {
 
 void CChatServer::JoinMSG(INT64 SessionID) {
 	CPlayer* newPlayer = _PlayerPool.Alloc();
-	newPlayer->_LastSessionID = newPlayer->_SessionID;
+	//newPlayer->_LastSessionID = newPlayer->_SessionID;
 	newPlayer->_SessionID = SessionID;
 	newPlayer->_dwRecvTime = timeGetTime();
-	newPlayer->_LastAccountNo = newPlayer->_AccountNo;
+	/*newPlayer->_LastAccountNo = newPlayer->_AccountNo;
 	newPlayer->_LastSectorX = newPlayer->_SectorX;
-	newPlayer->_LastSectorY = newPlayer->_SectorY;
+	newPlayer->_LastSectorY = newPlayer->_SectorY;*/
 	newPlayer->_SectorX = -1;
 	newPlayer->_SectorY = -1;
-	newPlayer->_LastMsg = 0;
+	//newPlayer->_LastMsg = 0;
 	newPlayer->_AccountNo = -1;
-	newPlayer->_MSGLen = 0;
-	memset((char*)newPlayer->_MSG, 0, 2048);
+	//newPlayer->_MSGLen = 0;
+	//memset((char*)newPlayer->_MSG, 0, 2048);
 	InsertPlayerMap(newPlayer);
 }
 
@@ -210,10 +210,10 @@ void CChatServer::ReqLogin(CPacket* pPacket, INT64 SessionID) {
 		}
 		if (bLogin) {
 			pPlayer->_dwRecvTime = timeGetTime();
-			pPlayer->_LastMsg = en_PACKET_CS_CHAT_RES_LOGIN;
+			//pPlayer->_LastMsg = en_PACKET_CS_CHAT_RES_LOGIN;
 			CPacket* pSendPacket = CPacket::Alloc();
 			MPResLogin(pSendPacket, en_PACKET_CS_CHAT_RES_LOGIN, 1, pPlayer->_AccountNo);
-			SendPacket(SessionID, pSendPacket, NET, true);
+			SendPacket(SessionID, pSendPacket, eNET, true);
 			pSendPacket->Free();
 		}
 	}
@@ -247,7 +247,7 @@ void CChatServer::ReqSectorMove(CPacket* pPacket, INT64 SessionID) {
 			return;
 		}
 		pPlayer->_dwRecvTime = timeGetTime();
-		pPlayer->_LastMsg = en_PACKET_CS_CHAT_RES_SECTOR_MOVE;
+		//pPlayer->_LastMsg = en_PACKET_CS_CHAT_RES_SECTOR_MOVE;
 		
 		//섹터 배정이 안된 경우
 		if (pPlayer->_SectorX == -1 && pPlayer->_SectorY == -1) {
@@ -269,7 +269,7 @@ void CChatServer::ReqSectorMove(CPacket* pPacket, INT64 SessionID) {
 		}
 		CPacket* pSendPacket = CPacket::Alloc();
 		MPResSectorMove(pSendPacket, en_PACKET_CS_CHAT_RES_SECTOR_MOVE, AccountNo, SectorX, SectorY);
-		SendPacket(SessionID, pSendPacket, NET, true);
+		SendPacket(SessionID, pSendPacket, eNET, true);
 		pSendPacket->Free();
 	}
 }
@@ -296,7 +296,7 @@ void CChatServer::ReqMessage(CPacket* pPacket, INT64 SessionID) {
 			return;
 		}
 		pPlayer->_dwRecvTime = timeGetTime();
-		pPlayer->_LastMsg = en_PACKET_CS_CHAT_RES_MESSAGE;
+		//pPlayer->_LastMsg = en_PACKET_CS_CHAT_RES_MESSAGE;
 		//섹터 배정이 안된 경우
 		if (pPlayer->_SectorX == -1 && pPlayer->_SectorY == -1) {
 			//CCrashDump::Crash();
@@ -309,8 +309,8 @@ void CChatServer::ReqMessage(CPacket* pPacket, INT64 SessionID) {
 				return;
 			}
 			pPacket->GetData((char*)Message, MessageLen);
-			memcpy((char*)pPlayer->_MSG, Message, MessageLen);
-			pPlayer->_MSGLen = MessageLen;
+			//memcpy((char*)pPlayer->_MSG, Message, MessageLen);
+			//pPlayer->_MSGLen = MessageLen;
 			//자신 주변 9개 섹터에 메세지 보내기
 			CPacket* pSendPacket = CPacket::Alloc();
 			MPResMessage(pSendPacket, en_PACKET_CS_CHAT_RES_MESSAGE, AccountNo, pPlayer->_ID,
@@ -347,7 +347,7 @@ void CChatServer::ReqHeartbeat(CPacket* pPacket, INT64 SessionID) {
 			return;
 		}
 		pPlayer->_dwRecvTime = timeGetTime();
-		pPlayer->_LastMsg = en_PACKET_CS_CHAT_REQ_HEARTBEAT;
+		//pPlayer->_LastMsg = en_PACKET_CS_CHAT_REQ_HEARTBEAT;
 	}
 }
 
@@ -407,7 +407,7 @@ bool CChatServer::Sector_RemovePlayer(CPlayer* pPlayer) {
 void CChatServer::SendPacketSector(CPacket* pPacket, WORD SectorX, WORD SectorY) {
 	auto IterEnd = _Sector[SectorY][SectorX].end();
 	for (auto it = _Sector[SectorY][SectorX].begin(); it != IterEnd;) {
-		SendPacket((*it)->_SessionID, pPacket, NET, true);
+		SendPacket((*it)->_SessionID, pPacket, eNET, true);
 		it++;
 	}
 }

@@ -37,12 +37,13 @@ public:
 		_iUseCount = 0;
 		_bPlacementNew = bPlacementNew;
 		_pFreeNode = new st_BLOCK_TOP_NODE;
-
+		st_BLOCK_NODE* temp;
+		void* chBlock;
 		if (iBlockNum == 0) return;
 		if (bPlacementNew) {
 			for (int i = 0; i < iBlockNum; i++) {
-				void* chBlock = malloc(sizeof(DATA) + sizeof(st_BLOCK_NODE));
-				st_BLOCK_NODE* temp = new (chBlock) st_BLOCK_NODE;
+				chBlock = malloc(sizeof(DATA) + sizeof(st_BLOCK_NODE));
+				temp = new (chBlock) st_BLOCK_NODE;
 
 				if (i == 0) {
 					_pFreeNode->pTopNode = temp;
@@ -57,8 +58,8 @@ public:
 		}
 		else {
 			for (int i = 0; i < iBlockNum; i++) {
-				void* chBlock = malloc(sizeof(DATA) + sizeof(st_BLOCK_NODE));
-				st_BLOCK_NODE* temp = new (chBlock) st_BLOCK_NODE;
+			chBlock = malloc(sizeof(DATA) + sizeof(st_BLOCK_NODE));
+				temp = new (chBlock) st_BLOCK_NODE;
 				new ((char*)chBlock + sizeof(st_BLOCK_NODE)) DATA;
 
 				if (i == 0) {
@@ -98,12 +99,12 @@ public:
 		st_BLOCK_NODE* pNewTop;
 		st_BLOCK_TOP_NODE pPopTop;
 		LONG64 CheckSum;
-
+		st_BLOCK_NODE* temp;
 		do {
 			pPopTop = *_pFreeNode;
 			if (pPopTop.pTopNode == NULL) {
 				void* chBlock = malloc(sizeof(DATA) + sizeof(st_BLOCK_NODE));
-				st_BLOCK_NODE* temp = new (chBlock) st_BLOCK_NODE;
+				temp = new (chBlock) st_BLOCK_NODE;
 
 				tempDATA = new ((char*)chBlock + sizeof(st_BLOCK_NODE)) DATA;
 				InterlockedIncrement(&_iAllocCount);

@@ -13,29 +13,32 @@ CNetServer::CNetServer() {
 	_DisCount = 0;
 }
 unsigned int WINAPI CNetServer::WorkerThread(LPVOID lParam) {
+	int retval;
+	DWORD cbTransferred = 0;
+	stSESSION* pSession;
+	stOVERLAPPED* Overlapped;
+	int iSessionUseSize = 0;
+	int iRecvTPS = 0;
+	WORD wPacketCount;
 	while (1) {
-		int retval;
-		DWORD cbTransferred = 0;
-		stSESSION* pSession;
-		stOVERLAPPED* Overlapped;
 		retval = GetQueuedCompletionStatus(_hcp, &cbTransferred, (PULONG_PTR)&pSession, (LPOVERLAPPED*)&Overlapped, INFINITE);
-		if (retval == false) {
+		/*if (retval == false) {
 			DWORD dwError = GetLastError();
 			if (dwError != 64)
 				Log(L"GQCS_CHAT", LEVEL_WARNING, (WCHAR*)L"SessionID: %lld, Overlapped Type: %d, Overlapped Error:%lld, WSAGetLastError: %d\n", 
 					pSession->SessionID, Overlapped->Type, Overlapped->Overlapped.Internal, dwError);
-		}
+		}*/
 		//종료 처리
 		if (Overlapped == NULL) {
 			return 0;
 		}
-		if (&pSession->RecvOverlapped != Overlapped && &pSession->SendOverlapped != Overlapped && &pSession->UpdateOverlapped != Overlapped) {
+		/*if (&pSession->RecvOverlapped != Overlapped && &pSession->SendOverlapped != Overlapped && &pSession->UpdateOverlapped != Overlapped) {
 			CCrashDump::Crash();
-		}
+		}*/
 		//연결 끊기
 		if (cbTransferred == 0) {
 			//CCrashDump::Crash();
-			DebugFunc(pSession, GQCS);
+			//DebugFunc(pSession, GQCS);
 			_Disconnect(pSession);
 		}
 		//Recv, Send 동작
@@ -43,18 +46,21 @@ unsigned int WINAPI CNetServer::WorkerThread(LPVOID lParam) {
 			//recv인 경우
 			//g_RecvCnt++;
 			if (Overlapped->Type == RECV) {
-				DebugFunc(pSession, RECVCOM);
-				pSession->iRecvbyte = cbTransferred;
-				pSession->recvComSessionID = pSession->SessionID;
-				//log
-				pSession->recvComtime = timeGetTime();
-				pSession->recvComTh = GetCurrentThreadId();
+
+				//DebugFunc(pSession, RECVCOM);
+				//pSession->iRecvbyte = cbTransferred;
+				//pSession->recvComSessionID = pSession->SessionID;
+				////log
+				//pSession->recvComtime = timeGetTime();
+				//pSession->recvComTh = GetCurrentThreadId();
 				//log
 				//데이터 받아서 SendQ에 넣은 후 Send하기
+				iRecvTPS = 0;
 				pSession->RecvQ.MoveRear(cbTransferred);
 				while (1) {
+					iSessionUseSize = pSession->RecvQ.GetUseSize();
 					//헤더 사이즈 이상이 있는지 확인
-					if (pSession->RecvQ.GetUseSize() < NETHEADER)
+					if (iSessionUseSize < NETHEADER)
 						break;
 					CPacket::stPACKET_HEADER stPacketHeader;
 					//데이터가 있는지 확인
@@ -70,46 +76,44 @@ unsigned int WINAPI CNetServer::WorkerThread(LPVOID lParam) {
 					
 						break;
 					}
-					if (pSession->RecvQ.GetUseSize() < int(NETHEADER + stPacketHeader.shLen))
+					if (iSessionUseSize < int(NETHEADER + stPacketHeader.shLen))
 						break;
-					//pSession->RecvQ.MoveFront(5);
 					CPacket* RecvPacket = CPacket::Alloc();
-					int retval = pSession->RecvQ.Dequeue(RecvPacket->GetBufferPtr(), stPacketHeader.shLen + 5);
+					retval = pSession->RecvQ.Dequeue(RecvPacket->GetBufferPtr(), stPacketHeader.shLen + 5);
 					RecvPacket->MoveWritePos(stPacketHeader.shLen);
 					if (retval < stPacketHeader.shLen + NETHEADER) {
 						_Disconnect(pSession);
-					
 						RecvPacket->Free();
 						break;
 					}
 					//여기서 OnRecv호출 전에 Decode를 통해 데이터 변조 유무 체크
 					RecvPacket->Decode();
-					BYTE CheckSum = RecvPacket->GetCheckSum();
-					if (CheckSum != (BYTE)*(RecvPacket->GetHeaderPtr() + 4)) {
+					if (RecvPacket->_CheckSum != (BYTE)*(RecvPacket->GetHeaderPtr() + 4)) {
 						_Disconnect(pSession);
-					
 						RecvPacket->Free();
 						break;
 					}
-					InterlockedIncrement(&_RecvTPS);
+					iRecvTPS++;
+					//InterlockedIncrement(&_RecvTPS);
 					OnRecv(pSession->SessionID, RecvPacket);
 					RecvPacket->Free();
 				}
-
+				InterlockedAdd(&_RecvTPS, iRecvTPS);
 				//Recv 요청하기
 				RecvPost(pSession);
 
 			}
 			//send 완료 경우
 			else if(Overlapped->Type == SEND) {
-				//log
-				DebugFunc(pSession, SENDCOM);
-				pSession->sendComtime = timeGetTime();
-				pSession->sendComTh = GetCurrentThreadId();
-				pSession->iSendbyte = cbTransferred;
-				pSession->sendComSessionID = pSession->SessionID;
-				//log
-				for (int i = 0; i < pSession->PacketCount; i++) {
+				////log
+				//DebugFunc(pSession, SENDCOM);
+				//pSession->sendComtime = timeGetTime();
+				//pSession->sendComTh = GetCurrentThreadId();
+				//pSession->iSendbyte = cbTransferred;
+				//pSession->sendComSessionID = pSession->SessionID;
+				////log
+				wPacketCount = pSession->PacketCount;
+				for (int i = 0; i < wPacketCount; i++) {
 					pSession->PacketArray[i]->Free();
 				}
 				pSession->PacketCount = 0;
@@ -119,12 +123,12 @@ unsigned int WINAPI CNetServer::WorkerThread(LPVOID lParam) {
 				}
 			}
 			else if (Overlapped->Type == UPDATE) {
-				DebugFunc(pSession, UPDATECOM);
-				//여기선 IOCount를 줄일 필요가 없다
-				//CCrashDump::Crash();
-				pSession->updateComtime = timeGetTime();
-				pSession->updateComSessionID = pSession->SessionID;
-				pSession->updateComTh = GetCurrentThreadId();
+				//DebugFunc(pSession, UPDATECOM);
+				////여기선 IOCount를 줄일 필요가 없다
+				////CCrashDump::Crash();
+				//pSession->updateComtime = timeGetTime();
+				//pSession->updateComSessionID = pSession->SessionID;
+				//pSession->updateComTh = GetCurrentThreadId();
 				SendPost(pSession);
 			}
 		}
@@ -133,6 +137,7 @@ unsigned int WINAPI CNetServer::WorkerThread(LPVOID lParam) {
 }
 
 unsigned int WINAPI CNetServer::AcceptThread(LPVOID lParam) {
+	stSESSION* pSession;
 	while (1) {
 		SOCKADDR_IN clientaddr;
 		int addrlen = sizeof(clientaddr);
@@ -158,71 +163,71 @@ unsigned int WINAPI CNetServer::AcceptThread(LPVOID lParam) {
 		}
 		
 		int curIdx;
-		//_IndexSession.Pop(&curIdx);
-		_IndexSession.Dequeue(&curIdx);
-		_SessionList[curIdx].sock = client_sock;
-		_SessionList[curIdx].clientaddr = clientaddr;
-		_SessionList[curIdx].SessionID = ++_SessionIDCnt;
-		_SessionList[curIdx].SessionIndex = curIdx;
-		_SessionList[curIdx].SessionID |= (_SessionList[curIdx].SessionIndex << 48);
-		memset(&_SessionList[curIdx].RecvOverlapped, 0, sizeof(_SessionList[curIdx].RecvOverlapped));
-		memset(&_SessionList[curIdx].SendOverlapped, 0, sizeof(_SessionList[curIdx].SendOverlapped));
-		memset(&_SessionList[curIdx].UpdateOverlapped, 0, sizeof(_SessionList[curIdx].UpdateOverlapped));
-		_SessionList[curIdx].RecvOverlapped.Type = RECV;
-		_SessionList[curIdx].SendOverlapped.Type = SEND;
-		_SessionList[curIdx].UpdateOverlapped.Type = UPDATE;
-		_SessionList[curIdx].RecvOverlapped.SessionID = _SessionList[curIdx].SessionID;
-		_SessionList[curIdx].SendOverlapped.SessionID = _SessionList[curIdx].SessionID;
-		_SessionList[curIdx].UpdateOverlapped.SessionID = _SessionList[curIdx].SessionID;
-		_SessionList[curIdx].IOCount = 1;
-		_SessionList[curIdx].RecvQ.ClearBuffer();
-		_SessionList[curIdx].SendQ.Clear();
-		_SessionList[curIdx].ReleaseFlag = TRUE;
-		_SessionList[curIdx].SendFlag = TRUE;
-		_SessionList[curIdx].PacketCount = 0;
-		//log
-		_SessionList[curIdx].iRecvbyte = 0;
-		_SessionList[curIdx].iSendbyte = 0;
-		_SessionList[curIdx].recvComSessionID = 0;
-		_SessionList[curIdx].sendComSessionID = 0;
-		_SessionList[curIdx].updateComSessionID = 0;
-		_SessionList[curIdx].releaseSessionID = 0;
-		_SessionList[curIdx].recvret = 0x11223344;
-		_SessionList[curIdx].sendret = 0x11223344;
-		_SessionList[curIdx].sendtime = 0;
-		_SessionList[curIdx].recvtime = 0;
-		_SessionList[curIdx].Distime = 0;
-		_SessionList[curIdx].sendComtime = 0;
-		_SessionList[curIdx].recvComtime = 0;
-		_SessionList[curIdx].updateComtime = 0;
-		_SessionList[curIdx].sendsock = NULL;
-		_SessionList[curIdx].recvsock = NULL;
-		_SessionList[curIdx].sendTh = 0;
-		_SessionList[curIdx].recvTh = 0;
-		_SessionList[curIdx].DisTh = 0;
-		_SessionList[curIdx].recvComTh = 0;
-		_SessionList[curIdx].sendComTh = 0;
-		_SessionList[curIdx].updateComTh = 0;
-		_SessionList[curIdx].ReleaseTh = 0;
-		_SessionList[curIdx].DisIO = -1;
-		_SessionList[curIdx].PQCSSessionID = 0;
-		_SessionList[curIdx].sendErr = 0;
-		_SessionList[curIdx].recvErr = 0;
-		_SessionList[curIdx].PQCSCnt = 0;
-		_SessionList[curIdx].recvLen[0] = 0;
-		_SessionList[curIdx].recvLen[1] = 0;
-		_SessionList[curIdx].debugCnt = 0;
-		DebugFunc(&_SessionList[curIdx], ACCEPT);
-		//log
+		_IndexSession.Pop(&curIdx);
+		pSession = &_SessionList[curIdx];
+		//_IndexSession.Dequeue(&curIdx);
+		pSession->sock = client_sock;
+		pSession->clientaddr = clientaddr;
+		pSession->SessionID = ++_SessionIDCnt;
+		pSession->SessionIndex = curIdx;
+		pSession->SessionID |= (pSession->SessionIndex << 48);
+		memset(&pSession->RecvOverlapped, 0, sizeof(pSession->RecvOverlapped));
+		memset(&pSession->SendOverlapped, 0, sizeof(pSession->SendOverlapped));
+		memset(&pSession->UpdateOverlapped, 0, sizeof(pSession->UpdateOverlapped));
+		pSession->RecvOverlapped.Type = RECV;
+		pSession->SendOverlapped.Type = SEND;
+		pSession->UpdateOverlapped.Type = UPDATE;
+		pSession->RecvOverlapped.SessionID = pSession->SessionID;
+		pSession->SendOverlapped.SessionID = pSession->SessionID;
+		pSession->UpdateOverlapped.SessionID = pSession->SessionID;
+		pSession->IOCount = 1;
+		pSession->RecvQ.ClearBuffer();
+		pSession->SendQ.Clear();
+		pSession->ReleaseFlag = TRUE;
+		pSession->SendFlag = TRUE;
+		pSession->PacketCount = 0;
+		////log
+		//_SessionList[curIdx].iRecvbyte = 0;
+		//_SessionList[curIdx].iSendbyte = 0;
+		//_SessionList[curIdx].recvComSessionID = 0;
+		//_SessionList[curIdx].sendComSessionID = 0;
+		//_SessionList[curIdx].updateComSessionID = 0;
+		//_SessionList[curIdx].releaseSessionID = 0;
+		//_SessionList[curIdx].recvret = 0x11223344;
+		//_SessionList[curIdx].sendret = 0x11223344;
+		//_SessionList[curIdx].sendtime = 0;
+		//_SessionList[curIdx].recvtime = 0;
+		//_SessionList[curIdx].Distime = 0;
+		//_SessionList[curIdx].sendComtime = 0;
+		//_SessionList[curIdx].recvComtime = 0;
+		//_SessionList[curIdx].updateComtime = 0;
+		//_SessionList[curIdx].sendsock = NULL;
+		//_SessionList[curIdx].recvsock = NULL;
+		//_SessionList[curIdx].sendTh = 0;
+		//_SessionList[curIdx].recvTh = 0;
+		//_SessionList[curIdx].DisTh = 0;
+		//_SessionList[curIdx].recvComTh = 0;
+		//_SessionList[curIdx].sendComTh = 0;
+		//_SessionList[curIdx].updateComTh = 0;
+		//_SessionList[curIdx].ReleaseTh = 0;
+		//_SessionList[curIdx].DisIO = -1;
+		//_SessionList[curIdx].PQCSSessionID = 0;
+		//_SessionList[curIdx].sendErr = 0;
+		//_SessionList[curIdx].recvErr = 0;
+		//_SessionList[curIdx].PQCSCnt = 0;
+		//_SessionList[curIdx].recvLen[0] = 0;
+		//_SessionList[curIdx].recvLen[1] = 0;
+		//_SessionList[curIdx].debugCnt = 0;
+		//DebugFunc(&_SessionList[curIdx], ACCEPT);
+		////log
 		InterlockedIncrement(&_SessionCnt);
-		WCHAR szClientIP[16];
-		InetNtop(AF_INET, &_SessionList[curIdx].clientaddr.sin_addr, szClientIP, 16);
+		/*WCHAR szClientIP[16];
+		InetNtop(AF_INET, &_SessionList[curIdx].clientaddr.sin_addr, szClientIP, 16);*/
 		//wprintf(L"Accept session %s:%d\n", szClientIP, ntohs(pSession->clientaddr.sin_port));
-		CreateIoCompletionPort((HANDLE)_SessionList[curIdx].sock, _hcp, (ULONG_PTR)&_SessionList[curIdx], 0);
-		OnClientJoin(_SessionList[curIdx].clientaddr, _SessionList[curIdx].SessionID);
-		RecvPost(&_SessionList[curIdx]);
-
-		ReleaseSession(&_SessionList[curIdx]);
+		CreateIoCompletionPort((HANDLE)pSession->sock, _hcp, (ULONG_PTR)pSession, 0);
+		OnClientJoin(pSession->clientaddr, pSession->SessionID);
+		RecvPost(pSession);
+		ReleaseSession(pSession);
 
 	}
 }
@@ -253,8 +258,8 @@ bool CNetServer::Start(ULONG OpenIP, USHORT Port, int NumWorkerthread, int NumIO
 		}
 
 		for (int i = _MaxSession - 1; i >= 0; i--)
-			_IndexSession.Enqueue(i);
-			//_IndexSession.Push(i);
+			//_IndexSession.Enqueue(i);
+			_IndexSession.Push(i);
 
 		//PacketBuffer 초기화
 		CPacket::Initial(iBlockNum, bPlacementNew);
@@ -310,15 +315,15 @@ int CNetServer::GetClientCount() {
 
 bool CNetServer::_Disconnect(stSESSION* pSession) {
 	//CCrashDump::Crash();
-	DebugFunc(pSession, DIS);
+	//DebugFunc(pSession, DIS);
 	int retval = InterlockedExchange(&pSession->sock, INVALID_SOCKET);
 	if (retval != INVALID_SOCKET) {
 		pSession->closeSock = retval;
 		CancelIoEx((HANDLE)pSession->closeSock, NULL);
-		//log
-		pSession->Distime = timeGetTime();
-		pSession->DisTh = GetCurrentThreadId();
-		//log
+		////log
+		//pSession->Distime = timeGetTime();
+		//pSession->DisTh = GetCurrentThreadId();
+		////log
 		InterlockedIncrement((LONG*)&_DisCount);
 		return true;
 	}
@@ -335,12 +340,12 @@ bool CNetServer::Disconnect(INT64 SessionID) {
 	if (retval != INVALID_SOCKET) {
 		pSession->closeSock = retval;
 		CancelIoEx((HANDLE)pSession->closeSock, NULL);
-		pSession->DisIO = GetLastError();
+		//pSession->DisIO = GetLastError();
 		InterlockedIncrement((LONG*)&_DisCount);
-		//log
-		pSession->Distime = timeGetTime();
-		pSession->DisTh = GetCurrentThreadId();
-		//log
+		////log
+		//pSession->Distime = timeGetTime();
+		//pSession->DisTh = GetCurrentThreadId();
+		////log
 		ReleaseSession(pSession);
 		return true;
 	}
@@ -350,9 +355,9 @@ bool CNetServer::Disconnect(INT64 SessionID) {
 
 bool CNetServer::_SendPacket(stSESSION* pSession, CPacket* pSendPacket, int type) {
 	pSendPacket->AddRef();
-	if (type == LAN)
+	if (type == eLAN)
 		pSendPacket->SetHeader_2();
-	else if (type == NET) {
+	else if (type == eNET) {
 		pSendPacket->SetHeader_5();
 		pSendPacket->Encode();
 	}
@@ -366,9 +371,9 @@ bool CNetServer::SendPacket(INT64 SessionID, CPacket* pSendPacket, int type, boo
 	if (pSession == NULL)
 		return false;
 	pSendPacket->AddRef();
-	if (type == LAN)
+	if (type == eLAN)
 		pSendPacket->SetHeader_2();
-	else if (type == NET) {
+	else if (type == eNET) {
 		pSendPacket->SetHeader_5();
 		pSendPacket->Encode();
 	}
@@ -376,9 +381,9 @@ bool CNetServer::SendPacket(INT64 SessionID, CPacket* pSendPacket, int type, boo
 	//SendPost를 Workerthread로 넘기기
 	if (post == true) {
 		InterlockedIncrement64(&pSession->IOCount);
-		pSession->PQCSSessionID = pSession->SessionID;
-		pSession->PQCSCnt++;
-		DebugFunc(pSession, PQCS);
+		//pSession->PQCSSessionID = pSession->SessionID;
+		//pSession->PQCSCnt++;
+		//DebugFunc(pSession, PQCS);
 		int retval = PostQueuedCompletionStatus(_hcp, sizeof(pSession), (ULONG_PTR)pSession, (WSAOVERLAPPED*)&pSession->UpdateOverlapped);
 		if (retval == 0)
 			CCrashDump::Crash();
@@ -429,8 +434,8 @@ void CNetServer::Release(stSESSION* pSession) {
 	stRELEASE temp;
 	INT64 SessionID = pSession->SessionID;
 	if (InterlockedCompareExchange128(&pSession->IOCount, (LONG64)FALSE, (LONG64)0, (LONG64*)&temp)) {
-		DebugFunc(pSession, RELEASE);
-		pSession->releaseSessionID = pSession->SessionID;
+		//DebugFunc(pSession, RELEASE);
+		//pSession->releaseSessionID = pSession->SessionID;
 		pSession->SessionID = -1;
 		InterlockedDecrement(&_SessionCnt);
 		while (pSession->SendQ.Size() > 0 || pSession->PacketCount>0) {
@@ -451,11 +456,11 @@ void CNetServer::Release(stSESSION* pSession) {
 		optval.l_onoff = 1;
 		setsockopt(pSession->closeSock, SOL_SOCKET, SO_LINGER, (char*)&optval, sizeof(optval));
 		closesocket(pSession->closeSock);
-		_IndexSession.Enqueue(pSession->SessionIndex);
-		//_IndexSession.Push(pSession->SessionIndex);
+		//_IndexSession.Enqueue(pSession->SessionIndex);
+		_IndexSession.Push(pSession->SessionIndex);
 		OnClientLeave(SessionID);
 		//log
-		pSession->ReleaseTh = GetCurrentThreadId();
+		//pSession->ReleaseTh = GetCurrentThreadId();
 	}
 	
 }
@@ -464,56 +469,59 @@ void CNetServer::RecvPost(stSESSION* pSession) {
 	memset(&pSession->RecvOverlapped, 0, sizeof(pSession->RecvOverlapped.Overlapped));
 	DWORD recvbyte = 0;
 	DWORD lpFlags = 0;
-	DebugFunc(pSession, RECVPOST);
+	//DebugFunc(pSession, RECVPOST);
 	//Recv 요청하기
-	if (pSession->RecvQ.GetFrontBufferPtr() <= pSession->RecvQ.GetRearBufferPtr() && (pSession->RecvQ.GetRearBufferPtr() != pSession->RecvQ.GetBufferPtr())) {
+	char* rearBufPtr = pSession->RecvQ.GetRearBufferPtr();
+	char* bufPtr = pSession->RecvQ.GetBufferPtr();
+	if ((rearBufPtr != bufPtr) && (pSession->RecvQ.GetFrontBufferPtr() <= rearBufPtr)) {
+		int iDirEnqSize = pSession->RecvQ.DirectEnqueueSize();
 		WSABUF recvbuf[2];
-		recvbuf[0].buf = pSession->RecvQ.GetRearBufferPtr();
-		recvbuf[0].len = pSession->RecvQ.DirectEnqueueSize();
-		recvbuf[1].buf = pSession->RecvQ.GetBufferPtr();
-		recvbuf[1].len = pSession->RecvQ.GetFreeSize() - pSession->RecvQ.DirectEnqueueSize();
-		pSession->recvLen[0] = recvbuf[0].len;
-		pSession->recvLen[1] = recvbuf[1].len;
+		recvbuf[0].buf = rearBufPtr;
+		recvbuf[0].len = iDirEnqSize;
+		recvbuf[1].buf = bufPtr;
+		recvbuf[1].len = pSession->RecvQ.GetFreeSize() - iDirEnqSize;
+		//pSession->recvLen[0] = recvbuf[0].len;
+		//pSession->recvLen[1] = recvbuf[1].len;
 		InterlockedIncrement64(&(pSession->IOCount));
-		pSession->recvsock = pSession->sock;
+		//pSession->recvsock = pSession->sock;
 		int retval = WSARecv(pSession->sock, recvbuf, 2, &recvbyte, &lpFlags, (WSAOVERLAPPED*)&pSession->RecvOverlapped, NULL);
 		if (retval == SOCKET_ERROR) {
 			if (WSAGetLastError() != ERROR_IO_PENDING) {
 				int WSA = WSAGetLastError();
-				pSession->recvErr = WSA;
+				//pSession->recvErr = WSA;
 				_Disconnect(pSession);
 				ReleaseSession(pSession);
 			}
 		}
 		//log
-		pSession->recvret = WSAGetLastError();
+		//pSession->recvret = WSAGetLastError();
 
 	}
 	else {
 		WSABUF recvbuf;
-		recvbuf.buf = pSession->RecvQ.GetRearBufferPtr();
+		recvbuf.buf = rearBufPtr;
 		recvbuf.len = pSession->RecvQ.DirectEnqueueSize();
-		pSession->recvLen[0] = recvbuf.len;
+		//pSession->recvLen[0] = recvbuf.len;
 		InterlockedIncrement64(&(pSession->IOCount));
-		pSession->recvsock = pSession->sock;
+		//pSession->recvsock = pSession->sock;
 		int retval = WSARecv(pSession->sock, &recvbuf, 1, &recvbyte, &lpFlags, (WSAOVERLAPPED*)&pSession->RecvOverlapped, NULL);
 		if (retval == SOCKET_ERROR) {
 			if (WSAGetLastError() != ERROR_IO_PENDING) {
 				int WSA = WSAGetLastError();
-				pSession->recvErr = WSA;
+				//pSession->recvErr = WSA;
 				_Disconnect(pSession);
 				ReleaseSession(pSession);
 			}
 		}
 		//log
-		pSession->recvret = WSAGetLastError();
+		//pSession->recvret = WSAGetLastError();
 	}
 	//log
 	//if (pSession->sock == INVALID_SOCKET)
 	//	CancelIo((HANDLE)pSession->closeSock);
 	//else {
-		pSession->recvtime = timeGetTime();
-		pSession->recvTh = GetCurrentThreadId();
+		//pSession->recvtime = timeGetTime();
+		//pSession->recvTh = GetCurrentThreadId();
 		//InterlockedIncrement(&pSession->DisIO);
 	//}
 }
@@ -526,7 +534,7 @@ void CNetServer::SendPost(stSESSION* pSession) {
 		InterlockedExchange(&(pSession->SendFlag), TRUE);
 		return;
 	}
-	DebugFunc(pSession, SENDPOST);
+	//DebugFunc(pSession, SENDPOST);
 	memset(&pSession->SendOverlapped, 0, sizeof(pSession->SendOverlapped.Overlapped));
 	DWORD sendbyte = 0;
 	DWORD lpFlags = 0;
@@ -538,36 +546,36 @@ void CNetServer::SendPost(stSESSION* pSession) {
 		pSession->SendQ.Dequeue(&(pSession->PacketArray[i]));
 		sendbuf[i].buf = pSession->PacketArray[i]->GetHeaderPtr();
 		sendbuf[i].len = pSession->PacketArray[i]->GetDataSize() + pSession->PacketArray[i]->GetHeaderSize();
-		pSession->PacketCount++;
 		i++;
 	}
+	pSession->PacketCount = i;
 	InterlockedAdd(&_SendTPS, i);
 	InterlockedIncrement64(&(pSession->IOCount));
-	pSession->sendsock = pSession->sock;
+	//pSession->sendsock = pSession->sock;
 	retval = WSASend(pSession->sock, sendbuf, pSession->PacketCount, &sendbyte, lpFlags, (WSAOVERLAPPED*)&pSession->SendOverlapped, NULL);
 	if (retval == SOCKET_ERROR) {
 		if (WSAGetLastError() != ERROR_IO_PENDING) {
 			int WSA = WSAGetLastError();
-			pSession->sendErr = WSA;
+			//pSession->sendErr = WSA;
 			_Disconnect(pSession);
 			ReleaseSession(pSession);
 		}
 	}
 	//log
-	pSession->sendtime = timeGetTime();
-	pSession->sendret = WSAGetLastError();
-	pSession->sendTh = GetCurrentThreadId();
+	//pSession->sendtime = timeGetTime();
+	//pSession->sendret = WSAGetLastError();
+	//pSession->sendTh = GetCurrentThreadId();
 	//log
 }
 
-void CNetServer::DebugFunc(stSESSION* pSession, int FuncNum) {
-	return;
-	int idx = InterlockedIncrement(&pSession->debugCnt);
-	idx %= DEBUGNUM;
-	pSession->debug[idx].FuncNum = FuncNum;
-	pSession->debug[idx].IOCount = pSession->IOCount;
-	pSession->debug[idx].SessionID = pSession->SessionID;
-	pSession->debug[idx].ThreadID = GetCurrentThreadId();
-	pSession->debug[idx].Sock = pSession->sock;
-	
-}
+//void CNetServer::DebugFunc(stSESSION* pSession, int FuncNum) {
+//	return;
+//	int idx = InterlockedIncrement(&pSession->debugCnt);
+//	idx %= DEBUGNUM;
+//	pSession->debug[idx].FuncNum = FuncNum;
+//	pSession->debug[idx].IOCount = pSession->IOCount;
+//	pSession->debug[idx].SessionID = pSession->SessionID;
+//	pSession->debug[idx].ThreadID = GetCurrentThreadId();
+//	pSession->debug[idx].Sock = pSession->sock;
+//	
+//}

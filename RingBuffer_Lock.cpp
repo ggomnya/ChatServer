@@ -58,54 +58,54 @@ int CRingBuffer::DirectDequeueSize() {
 }
 
 int CRingBuffer::Enqueue(char* chpData, int iSize) {
-	int iTempSize = GetFreeSize();
+	/*int iTempSize = GetFreeSize();
 	if (iTempSize > iSize)
-		iTempSize = iSize;
-	if (iTempSize + _iRear >= _iBufferSize) {
+		iTempSize = iSize;*/
+	if (iSize + _iRear >= _iBufferSize) {
 		int iTempSize2 = _iBufferSize - _iRear;
 		memcpy_s((_Buffer + _iRear), iTempSize2, chpData, iTempSize2);
-		memcpy_s((_Buffer), iTempSize -iTempSize2, chpData + iTempSize2, iTempSize - iTempSize2);
+		memcpy_s((_Buffer), iSize -iTempSize2, chpData + iTempSize2, iSize - iTempSize2);
 	}
 	else 
-		memcpy_s((_Buffer + _iRear), iTempSize, chpData, iTempSize);
-	_iRear += iTempSize;
+		memcpy_s((_Buffer + _iRear), iSize, chpData, iSize);
+	_iRear += iSize;
 	_iRear %= _iBufferSize;
 
-	return iTempSize;
+	return iSize;
 	
 }
 
 int CRingBuffer::Dequeue(char* chpDest, int iSize) {
-	int iTempSize = GetUseSize();
-	if (iTempSize > iSize)
-		iTempSize = iSize;
+	//int iTempSize = GetUseSize();
+	//if (iTempSize > iSize)
+	//	iTempSize = iSize;
 
-	if (iTempSize + _iFront >= _iBufferSize) {
+	if (iSize + _iFront >= _iBufferSize) {
 		int iTempSize2 = _iBufferSize - _iFront;
 		memcpy_s(chpDest,iTempSize2, (_Buffer + _iFront), iTempSize2);
-		memcpy_s(chpDest + iTempSize2, iTempSize - iTempSize2, _Buffer, iTempSize - iTempSize2);
+		memcpy_s(chpDest + iTempSize2, iSize - iTempSize2, _Buffer, iSize - iTempSize2);
 	}
 	else
-		memcpy_s(chpDest, iTempSize, (_Buffer + _iFront), iTempSize);
-	_iFront += iTempSize;
+		memcpy_s(chpDest, iSize, (_Buffer + _iFront), iSize);
+	_iFront += iSize;
 	_iFront %= _iBufferSize;
 
-	return iTempSize;
+	return iSize;
 }
 
 int CRingBuffer::Peek(char* chpDest, int iSize) {
-	int iTempSize = GetUseSize();
+	/*int iTempSize = GetUseSize();
 	if (iTempSize > iSize)
-		iTempSize = iSize;
+		iTempSize = iSize;*/
 
-	if (iTempSize + _iFront >= _iBufferSize) {
+	if (iSize + _iFront >= _iBufferSize) {
 		int iTempSize2 = _iBufferSize - _iFront;
 		memcpy_s(chpDest, iTempSize2, (_Buffer + _iFront), iTempSize2);
-		memcpy_s(chpDest + iTempSize2, iTempSize - iTempSize2, _Buffer, iTempSize - iTempSize2);
+		memcpy_s(chpDest + iTempSize2, iSize - iTempSize2, _Buffer, iSize - iTempSize2);
 	}
 	else
-		memcpy_s(chpDest, iTempSize, (_Buffer + _iFront), iTempSize);
-	return iTempSize;
+		memcpy_s(chpDest, iSize, (_Buffer + _iFront), iSize);
+	return iSize;
 }
 
 void CRingBuffer::MoveRear(int iSize) {

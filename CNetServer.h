@@ -25,9 +25,8 @@ class CNetServer {
 private:
 	//SRWLOCK srwINDEX;
 	stSESSION* _SessionList;
-	//CLockfreeStack<int> _IndexSession;
-	CLockfreeQueue<int> _IndexSession;
-	//stack<int> _IndexSession;
+	CLockfreeStack<int> _IndexSession;
+	//CLockfreeQueue<int> _IndexSession;
 	INT64 _SessionIDCnt;
 	SOCKET _Listen_sock;
 	HANDLE _hcp;
@@ -41,7 +40,7 @@ public:
 	int _AcceptCount;
 	int _AcceptTPS;
 	volatile LONG _SendTPS;
-	volatile DWORD _RecvTPS;
+	volatile LONG _RecvTPS;
 	int _DisCount;
 
 	CNetServer();
@@ -64,8 +63,8 @@ public:
 	int GetClientCount();
 	bool _Disconnect(stSESSION* pSession);
 	bool Disconnect(INT64 SessionID);
-	bool _SendPacket(stSESSION* pSession, CPacket* pSendPacket, int type = NET);
-	bool SendPacket(INT64 SessionID, CPacket* pSendPacket, int type = NET, bool post = false);
+	bool _SendPacket(stSESSION* pSession, CPacket* pSendPacket, int type = eNET);
+	bool SendPacket(INT64 SessionID, CPacket* pSendPacket, int type = eNET, bool post = false);
 	stSESSION* FindSession(INT64 SessionID);
 	void ReleaseSession(stSESSION* pSession);
 
@@ -73,7 +72,7 @@ public:
 	void SendPost(stSESSION* pSession);
 	void Release(stSESSION* pSession);
 
-	void DebugFunc(stSESSION* pSession, int FuncNum);
+	//void DebugFunc(stSESSION* pSession, int FuncNum);
 
 
 	
