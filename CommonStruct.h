@@ -7,6 +7,7 @@
 #include "LockfreeQueue.h"
 #include "PacketBuffer.h"
 
+enum { LOGIN = 1, GAME, CHAT, MONITOR };
 enum { SEND, RECV, UPDATE, CONNECT };
 enum { eLAN, eNET };
 enum { ACCEPT, RECVCOM, SENDCOM, UPDATECOM, PQCS, RECVPOST, SENDPOST, DIS, RELEASE, GQCS};

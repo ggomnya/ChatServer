@@ -12,12 +12,9 @@ CChatServer::CChatServer() {
 }
 
 unsigned int WINAPI CChatServer::UpdateThread(LPVOID lParam) {
-	/*SYSLOG_DIRECTORY(L"Log_Heartbeat");
-	SYSLOG_LEVEL(LEVEL_DEBUG);*/
 	st_UPDATE_MSG* updateMsg;
 	while (1) {
 		int retval = WaitForSingleObject(_hEvent, 1000*10);
-		//_BlockCount++;
 		if (retval == WAIT_OBJECT_0) {
 			while (1) {
 				if (_MsgQueue.Size() == 0)
@@ -86,17 +83,17 @@ unsigned int WINAPI CChatServer::UpdateThread(LPVOID lParam) {
 void CChatServer::JoinMSG(INT64 SessionID) {
 	CPlayer* newPlayer = _PlayerPool.Alloc();
 	//newPlayer->_LastSessionID = newPlayer->_SessionID;
-	newPlayer->_SessionID = SessionID;
-	newPlayer->_dwRecvTime = timeGetTime();
 	/*newPlayer->_LastAccountNo = newPlayer->_AccountNo;
 	newPlayer->_LastSectorX = newPlayer->_SectorX;
 	newPlayer->_LastSectorY = newPlayer->_SectorY;*/
-	newPlayer->_SectorX = -1;
-	newPlayer->_SectorY = -1;
 	//newPlayer->_LastMsg = 0;
-	newPlayer->_AccountNo = -1;
 	//newPlayer->_MSGLen = 0;
 	//memset((char*)newPlayer->_MSG, 0, 2048);
+	newPlayer->_SessionID = SessionID;
+	newPlayer->_dwRecvTime = timeGetTime();
+	newPlayer->_SectorX = -1;
+	newPlayer->_SectorY = -1;
+	newPlayer->_AccountNo = -1;
 	InsertPlayerMap(newPlayer);
 }
 
@@ -136,12 +133,7 @@ void CChatServer::CheckHeartbeat() {
 	for (auto it = _PlayerMap.begin(); it != _PlayerMap.end();) {
 		//이 경우 연결 끊기
 		if (it->second->_dwRecvTime < _dwHeartbeatTime - 1000*10) {
-			//CCrashDump::Crash();
 			CPlayer* pPlayer = it->second;
-			/*/
-			/*_LOG(L"HEARTBEAT", LEVEL_DEBUG, L"SessionID: %ld, AccountNo:%ld, RecvTime: %d\n", 
-				pPlayer->_SessionID, pPlayer->_AccountNo, pPlayer->_dwRecvTime);*/
-			//_PlayerPool.Free(pPlayer);
 			_HeartbeatDis++;
 			Disconnect(it->second->_SessionID);
 			
@@ -232,12 +224,10 @@ void CChatServer::ReqSectorMove(CPacket* pPacket, INT64 SessionID) {
 	CPlayer* pPlayer = FindPlayerMap(SessionID);
 	if (pPlayer == NULL) {
 		Disconnect(SessionID);
-		//CCrashDump::Crash();
 	}
 	else {
 		//AccountNo가 틀린 경우
 		if (pPlayer->_AccountNo != AccountNo) {
-			//CCrashDump::Crash();
 			Disconnect(SessionID);
 			return;
 		}
@@ -339,7 +329,6 @@ void CChatServer::ReqHeartbeat(CPacket* pPacket, INT64 SessionID) {
 	CPlayer* pPlayer = FindPlayerMap(SessionID);
 	if (pPlayer == NULL) {
 		Disconnect(SessionID);
-		//CCrashDump::Crash();
 	}
 	else {
 		if (pPacket->GetDataSize() > 0) {

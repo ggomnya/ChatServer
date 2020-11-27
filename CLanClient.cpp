@@ -117,6 +117,7 @@ bool CLanClient::Start(WCHAR* ServerIP, USHORT Port, int NumWorkerthread, int Nu
 	_ClientSession.RecvOverlapped.Type = RECV;
 	_ClientSession.SendOverlapped.Type = SEND;
 	_ClientSession.ConnectOverlapped.Type = CONNECT;
+	_ClientSession.SessionID = -1;
 
 	memset(&_ClientSession.serveraddr, 0, sizeof(_ClientSession.serveraddr));
 	_ClientSession.serveraddr.sin_family = AF_INET;
@@ -149,11 +150,11 @@ bool CLanClient::Connect() {
 	_ClientSession.SendFlag = TRUE;
 	_ClientSession.PacketCount = 0;
 	_ClientSession.IOCount = 1;
-	_ClientSession.SessionID = ++_SessionIDCnt;
 	FD_SET wset;
 	FD_ZERO(&wset);
 	timeval time;
 	time = { 0, 300 * 1000 };
+
 	while (1) {
 		_ClientSession.sock = socket(AF_INET, SOCK_STREAM, 0);
 		if (_ClientSession.sock == INVALID_SOCKET) {
@@ -186,6 +187,7 @@ bool CLanClient::Connect() {
 				return false;*/
 		}
 		else {
+			_ClientSession.SessionID = ++_SessionIDCnt;
 			_ConnectFail = 0;
 			_ConnectSuccess++;
 			break;
@@ -232,6 +234,8 @@ bool CLanClient::Disconnect(INT64 SessionID) {
 }
 
 bool CLanClient::SendPacket(CPacket* pSendPacket) {
+	if (_ClientSession.SessionID == -1)
+		return true;
 	InterlockedIncrement64(&_ClientSession.IOCount);
 	//InterlockedIncrement64(&PacketNum);
 	pSendPacket->AddRef();

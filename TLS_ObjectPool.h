@@ -7,7 +7,7 @@
 template <class DATA>
 class TLS_CObjectPool {
 private:
-	#define MAXNUM	200
+	#define MAXNUM	1000
 	struct st_DATA;
 	//데이터 뒤에 포인터를 붙여 포인터가 st_DATA의 앞을 가르키게 만들어 free할 때
 	//ObjectPool에 st_DATA 구조체를 반납할 수 있도록 한다.

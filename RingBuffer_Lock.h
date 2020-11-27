@@ -1,6 +1,6 @@
 #pragma once
 #include <Windows.h>
-#define dfMAX_RINGBUFFER_SIZE	20000
+#define dfMAX_RINGBUFFER_SIZE	15000
 
 
 

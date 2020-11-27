@@ -37,7 +37,6 @@ unsigned int WINAPI CNetServer::WorkerThread(LPVOID lParam) {
 		}*/
 		//연결 끊기
 		if (cbTransferred == 0) {
-			//CCrashDump::Crash();
 			//DebugFunc(pSession, GQCS);
 			_Disconnect(pSession);
 		}
@@ -67,13 +66,11 @@ unsigned int WINAPI CNetServer::WorkerThread(LPVOID lParam) {
 					pSession->RecvQ.Peek((char*)&stPacketHeader, NETHEADER);
 					//헤더 코드 검증
 					if (stPacketHeader.byCode != dfPACKET_CODE) {
-						_Disconnect(pSession);
-						
+						_Disconnect(pSession);						
 						break;
 					}
 					if (stPacketHeader.shLen > dfMAX_PACKET_BUFFER_SIZE- NETHEADER) {
 						_Disconnect(pSession);
-					
 						break;
 					}
 					if (iSessionUseSize < int(NETHEADER + stPacketHeader.shLen))
@@ -94,7 +91,6 @@ unsigned int WINAPI CNetServer::WorkerThread(LPVOID lParam) {
 						break;
 					}
 					iRecvTPS++;
-					//InterlockedIncrement(&_RecvTPS);
 					OnRecv(pSession->SessionID, RecvPacket);
 					RecvPacket->Free();
 				}
@@ -221,9 +217,6 @@ unsigned int WINAPI CNetServer::AcceptThread(LPVOID lParam) {
 		//DebugFunc(&_SessionList[curIdx], ACCEPT);
 		////log
 		InterlockedIncrement(&_SessionCnt);
-		/*WCHAR szClientIP[16];
-		InetNtop(AF_INET, &_SessionList[curIdx].clientaddr.sin_addr, szClientIP, 16);*/
-		//wprintf(L"Accept session %s:%d\n", szClientIP, ntohs(pSession->clientaddr.sin_port));
 		CreateIoCompletionPort((HANDLE)pSession->sock, _hcp, (ULONG_PTR)pSession, 0);
 		OnClientJoin(pSession->clientaddr, pSession->SessionID);
 		RecvPost(pSession);
@@ -258,7 +251,6 @@ bool CNetServer::Start(ULONG OpenIP, USHORT Port, int NumWorkerthread, int NumIO
 		}
 
 		for (int i = _MaxSession - 1; i >= 0; i--)
-			//_IndexSession.Enqueue(i);
 			_IndexSession.Push(i);
 
 		//PacketBuffer 초기화
@@ -314,7 +306,6 @@ int CNetServer::GetClientCount() {
 }
 
 bool CNetServer::_Disconnect(stSESSION* pSession) {
-	//CCrashDump::Crash();
 	//DebugFunc(pSession, DIS);
 	int retval = InterlockedExchange(&pSession->sock, INVALID_SOCKET);
 	if (retval != INVALID_SOCKET) {
@@ -332,7 +323,6 @@ bool CNetServer::_Disconnect(stSESSION* pSession) {
 
 
 bool CNetServer::Disconnect(INT64 SessionID) {
-	//CCrashDump::Crash();
 	stSESSION* pSession = FindSession(SessionID);
 	if (pSession == NULL)
 		return false;
@@ -340,7 +330,6 @@ bool CNetServer::Disconnect(INT64 SessionID) {
 	if (retval != INVALID_SOCKET) {
 		pSession->closeSock = retval;
 		CancelIoEx((HANDLE)pSession->closeSock, NULL);
-		//pSession->DisIO = GetLastError();
 		InterlockedIncrement((LONG*)&_DisCount);
 		////log
 		//pSession->Distime = timeGetTime();
@@ -456,7 +445,6 @@ void CNetServer::Release(stSESSION* pSession) {
 		optval.l_onoff = 1;
 		setsockopt(pSession->closeSock, SOL_SOCKET, SO_LINGER, (char*)&optval, sizeof(optval));
 		closesocket(pSession->closeSock);
-		//_IndexSession.Enqueue(pSession->SessionIndex);
 		_IndexSession.Push(pSession->SessionIndex);
 		OnClientLeave(SessionID);
 		//log
