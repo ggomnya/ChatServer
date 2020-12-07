@@ -21,20 +21,7 @@ using namespace std;
 
 
 class CLanClient {
-private:
-	SRWLOCK srwINDEX;
-	stSESSION _ClientSession;
-	HANDLE _hcp;
-	HANDLE* _hWorkerThread;
-	INT64 _SessionIDCnt;
-	int _NumThread;
 public:
-	int _SendTPS;
-	int _RecvTPS;
-	int _DisCount;
-	int _ConnectFail;
-	int _ConnectSuccess;
-
 	CLanClient();
 	static unsigned int WINAPI WorkerThreadFunc(LPVOID lParam) {
 		((CLanClient*)lParam)->WorkerThread(lParam);
@@ -43,24 +30,36 @@ public:
 	unsigned int WINAPI WorkerThread(LPVOID lParam);
 	bool Start(WCHAR* ServerIP, USHORT Port, int NumWorkerthread, int NumIOCP, int iBlockNum = 0, bool bPlacementNew = false);
 	bool Connect();
-
-	bool _Disconnect(stSESSION* pSession);
 	bool Disconnect(INT64 SessionID);
 	bool SendPacket(CPacket* pSendPacket);
-	void ReleaseSession(stSESSION* pSession);
 	void ReConnect();
+
+	virtual void OnEnterJoinServer(INT64 SessionID) = 0;
+	virtual void OnLeaveServer(INT64 SessionID) = 0;
+	virtual void OnRecv(INT64 SessionID, CPacket* pRecvPacket) = 0;
+	//virtual void OnSend(INT64 SessionID, int SendSize) = 0;
+	virtual void OnError(int errorcode, const WCHAR* Err) = 0;
+
+private:
+	bool _Disconnect(stSESSION* pSession); 
+	void ReleaseSession(stSESSION* pSession);
 	void RecvPost(stSESSION* pSession);
 	void SendPost(stSESSION* pSession);
 	void Release(stSESSION* pSession);
+	void RecvComp(stSESSION* pSession, DWORD cbTransferred);
+	void SendComp(stSESSION* pSession);
 
-
-	
-	virtual void OnEnterJoinServer(INT64 SessionID) = 0;
-	virtual void OnLeaveServer(INT64 SessionID) = 0;
-
-	virtual void OnRecv(INT64 SessionID, CPacket* pRecvPacket) = 0;
-	//virtual void OnSend(INT64 SessionID, int SendSize) = 0;
-
-	virtual void OnError(int errorcode, const WCHAR* Err) = 0;
-
+public:
+	int _SendTPS;
+	int _RecvTPS;
+	int _DisCount;
+	int _ConnectFail;
+	int _ConnectSuccess;
+private:
+	SRWLOCK srwINDEX;
+	stSESSION _ClientSession;
+	HANDLE _hcp;
+	HANDLE* _hWorkerThread;
+	INT64 _SessionIDCnt;
+	int _NumThread;
 };

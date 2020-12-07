@@ -25,51 +25,9 @@ unsigned int WINAPI CChatServer::UpdateThread(LPVOID lParam) {
 					CheckToken();*/
 				_MsgQueue.Dequeue(&updateMsg);
 				_MsgTPS++;
-				switch (updateMsg->byType) {
-				case dfJOIN: {
-					JoinMSG(updateMsg->SessionID);
-					break;
-				}
-				case dfPACKET: {
-					WORD Type;
-					*(updateMsg->pPacket) >> Type;
-					//패킷 타입에 따라 처리
-					switch (Type) {
-					case en_PACKET_CS_CHAT_REQ_LOGIN:
-					{
-						ReqLogin(updateMsg->pPacket, updateMsg->SessionID);
-						break;
-					}
-					case en_PACKET_CS_CHAT_REQ_SECTOR_MOVE:
-					{
-						ReqSectorMove(updateMsg->pPacket, updateMsg->SessionID);
-						break;
-					}
-					case en_PACKET_CS_CHAT_REQ_MESSAGE:
-					{
-						ReqMessage(updateMsg->pPacket, updateMsg->SessionID);
-						break;
-					}
-					case en_PACKET_CS_CHAT_REQ_HEARTBEAT:
-					{
-						ReqHeartbeat(updateMsg->pPacket, updateMsg->SessionID);
-						break;
-					}
-					default:
-						Disconnect(updateMsg->SessionID);
-						break;
-					}
-					updateMsg->pPacket->Free();
-					break;
-				}
-				case dfLEAVE: {
-					LeaveMSG(updateMsg->SessionID);
-					break;
-				}
-				default:
-					CCrashDump::Crash();
-					break;
-				}
+
+				MsgProc(updateMsg);
+
 				_UpdateMsgPool.Free(updateMsg);
 			}
 		}
@@ -97,6 +55,46 @@ void CChatServer::JoinMSG(INT64 SessionID) {
 	InsertPlayerMap(newPlayer);
 }
 
+void CChatServer::PacketMSG(st_UPDATE_MSG* updateMsg) {
+	WORD Type;
+	try {
+		*(updateMsg->pPacket) >> Type;
+	}
+	catch (CPacket::EX * err) {
+		delete err;
+		Disconnect(updateMsg->SessionID);
+		updateMsg->pPacket->Free();
+		return;
+	}
+	//패킷 타입에 따라 처리
+	switch (Type) {
+	case en_PACKET_CS_CHAT_REQ_LOGIN:
+	{
+		ReqLogin(updateMsg->pPacket, updateMsg->SessionID);
+		break;
+	}
+	case en_PACKET_CS_CHAT_REQ_SECTOR_MOVE:
+	{
+		ReqSectorMove(updateMsg->pPacket, updateMsg->SessionID);
+		break;
+	}
+	case en_PACKET_CS_CHAT_REQ_MESSAGE:
+	{
+		ReqMessage(updateMsg->pPacket, updateMsg->SessionID);
+		break;
+	}
+	case en_PACKET_CS_CHAT_REQ_HEARTBEAT:
+	{
+		ReqHeartbeat(updateMsg->pPacket, updateMsg->SessionID);
+		break;
+	}
+	default:
+		Disconnect(updateMsg->SessionID);
+		break;
+	}
+	updateMsg->pPacket->Free();
+}
+
 void CChatServer::LeaveMSG(INT64 SessionID) {
 	CPlayer* pPlayer = FindPlayerMap(SessionID);
 	if (pPlayer == NULL) {
@@ -119,15 +117,37 @@ void CChatServer::LeaveMSG(INT64 SessionID) {
 			}
 			RemovePlayerMap(pPlayer);
 		}
+
 		//더미가 먼저 끊었는지 확인하기
 		/*if (memcmp((char*)pPlayer->_MSG, L"=", pPlayer->_MSGLen) != 0) {
 			CCrashDump::Crash();
 		}*/
+
 		_PlayerPool.Free(pPlayer);
 	}
 
 }
-//PlayerMap에서 삭제를 누가 할 것인가?
+
+void CChatServer::MsgProc(st_UPDATE_MSG* updateMsg) {
+	switch (updateMsg->byType) {
+	case eJOIN: {
+		JoinMSG(updateMsg->SessionID);
+		break;
+	}
+	case ePACKET: {
+		PacketMSG(updateMsg);
+		break;
+	}
+	case eLEAVE: {
+		LeaveMSG(updateMsg->SessionID);
+		break;
+	}
+	default:
+		CCrashDump::Crash();
+		break;
+	}
+}
+
 void CChatServer::CheckHeartbeat() {
 	_dwHeartbeatTime = timeGetTime();
 	for (auto it = _PlayerMap.begin(); it != _PlayerMap.end();) {
@@ -161,26 +181,27 @@ void CChatServer::CheckToken() {
 void CChatServer::ReqLogin(CPacket* pPacket, INT64 SessionID) {
 	CPlayer* pPlayer = FindPlayerMap(SessionID);
 	if (pPlayer == NULL) {
-		CPacket* pSendPacket = CPacket::Alloc();
-		MPResLogin(pSendPacket, en_PACKET_CS_CHAT_RES_LOGIN, 0, 0);
-		SendPacket(SessionID, pSendPacket);
-		pSendPacket->Free();
-		Disconnect(SessionID);
 		CCrashDump::Crash();
 	}
 	else {
-		if (pPacket->GetDataSize() != 152) {
+		//Packet Data에 대한 오류 체크
+		bool bLogin = true;
+		try {
+			*pPacket >> pPlayer->_AccountNo;
+			pPacket->GetData((char*)pPlayer->_ID, 40);
+			pPacket->GetData((char*)pPlayer->_Nickname, 40);
+			pPacket->GetData(pPlayer->_SessionKey, 64);
+		}
+		catch (CPacket::EX* err) {
+			delete err;
 			Disconnect(SessionID);
 			return;
 		}
+
 		//TokenMap을 통해 해당 토큰이 유효한지 확인
-		bool bLogin = true;
-		*pPacket >> pPlayer->_AccountNo;
-		pPacket->GetData((char*)pPlayer->_ID, 40);
-		pPacket->GetData((char*)pPlayer->_Nickname, 40);
-		pPacket->GetData(pPlayer->_SessionKey, 64);
 		AcquireSRWLockExclusive(&CLoginClient::_srwTOKEN);
 		st_TOKEN* pToken = CLoginClient::FindToken(pPlayer->_AccountNo);
+
 		//해당 account가 없는 경우
 		if (pToken == NULL) {
 			ReleaseSRWLockExclusive(&CLoginClient::_srwTOKEN);
@@ -195,11 +216,13 @@ void CChatServer::ReqLogin(CPacket* pPacket, INT64 SessionID) {
 				Disconnect(SessionID);
 				bLogin = false;
 			}
+
 			//제대로 토큰을 뽑은 경우
 			CLoginClient::_TokenMap.erase(pPlayer->_AccountNo);
 			ReleaseSRWLockExclusive(&CLoginClient::_srwTOKEN);
 			CLoginClient::_TokenPool.Free(pToken);
 		}
+
 		if (bLogin) {
 			pPlayer->_dwRecvTime = timeGetTime();
 			//pPlayer->_LastMsg = en_PACKET_CS_CHAT_RES_LOGIN;
@@ -216,14 +239,20 @@ void CChatServer::ReqSectorMove(CPacket* pPacket, INT64 SessionID) {
 	INT64 AccountNo;
 	WORD SectorX;
 	WORD SectorY;
-	if (pPacket->GetDataSize() != 12) {
+
+	//Packet Data에 대한 오류 체크
+	try {
+		*pPacket >> AccountNo >> SectorX >> SectorY;
+	}
+	catch (CPacket::EX * err) {
+		delete err;
 		Disconnect(SessionID);
 		return;
 	}
-	*pPacket >> AccountNo >> SectorX >> SectorY;
+
 	CPlayer* pPlayer = FindPlayerMap(SessionID);
 	if (pPlayer == NULL) {
-		Disconnect(SessionID);
+		CCrashDump::Crash();
 	}
 	else {
 		//AccountNo가 틀린 경우
@@ -231,11 +260,13 @@ void CChatServer::ReqSectorMove(CPacket* pPacket, INT64 SessionID) {
 			Disconnect(SessionID);
 			return;
 		}
+
 		//잘못된 섹터로 이동하려 하는 경우
 		if (SectorX < 0 || SectorX>50 || SectorY < 0 || SectorY>50) {
 			Disconnect(SessionID);
 			return;
 		}
+
 		pPlayer->_dwRecvTime = timeGetTime();
 		//pPlayer->_LastMsg = en_PACKET_CS_CHAT_RES_SECTOR_MOVE;
 		
@@ -245,18 +276,19 @@ void CChatServer::ReqSectorMove(CPacket* pPacket, INT64 SessionID) {
 			pPlayer->_SectorY = SectorY;
 			Sector_AddPlayer(pPlayer);
 		}
+
 		//배정이 된 경우
 		else {
 			bool retval = Sector_RemovePlayer(pPlayer);
 			if (!retval) {
 				//있어선 안됨
-				//CCrashDump::Crash();
-				return;
+				CCrashDump::Crash();
 			}
 			pPlayer->_SectorX = SectorX;
 			pPlayer->_SectorY = SectorY;
 			Sector_AddPlayer(pPlayer);
 		}
+
 		CPacket* pSendPacket = CPacket::Alloc();
 		MPResSectorMove(pSendPacket, en_PACKET_CS_CHAT_RES_SECTOR_MOVE, AccountNo, SectorX, SectorY);
 		SendPacket(SessionID, pSendPacket, eNET, true);
@@ -268,45 +300,47 @@ void CChatServer::ReqMessage(CPacket* pPacket, INT64 SessionID) {
 	INT64 AccountNo;
 	WORD MessageLen;
 	WCHAR Message[1024];
+
 	CPlayer* pPlayer = FindPlayerMap(SessionID);
 	if (pPlayer == NULL) {
-		Disconnect(SessionID);
-		//CCrashDump::Crash();
+		CCrashDump::Crash();
 	}
 	else {
-		if (pPacket->GetDataSize() < 10) {
+		//Packet Data에 대한 오류 체크
+		try {
+			*pPacket >> AccountNo >> MessageLen;
+			pPacket->GetData((char*)Message, MessageLen);
+		}
+		catch (CPacket::EX * err) {
+			delete err;
 			Disconnect(SessionID);
 			return;
 		}
-		*pPacket >> AccountNo;
+
 		//AccountNo가 틀린 경우
 		if (pPlayer->_AccountNo != AccountNo) {
-			//CCrashDump::Crash();
 			Disconnect(SessionID);
 			return;
 		}
 		pPlayer->_dwRecvTime = timeGetTime();
 		//pPlayer->_LastMsg = en_PACKET_CS_CHAT_RES_MESSAGE;
+
 		//섹터 배정이 안된 경우
 		if (pPlayer->_SectorX == -1 && pPlayer->_SectorY == -1) {
-			//CCrashDump::Crash();
 			Disconnect(SessionID);
 		}
 		else {
-			*pPacket >> MessageLen;
-			if (pPacket->GetDataSize() != MessageLen) {
-				Disconnect(SessionID);
-				return;
-			}
-			pPacket->GetData((char*)Message, MessageLen);
 			//memcpy((char*)pPlayer->_MSG, Message, MessageLen);
 			//pPlayer->_MSGLen = MessageLen;
+
 			//자신 주변 9개 섹터에 메세지 보내기
 			CPacket* pSendPacket = CPacket::Alloc();
 			MPResMessage(pSendPacket, en_PACKET_CS_CHAT_RES_MESSAGE, AccountNo, pPlayer->_ID,
 				pPlayer->_Nickname, MessageLen, Message);
+
 			WORD SectorX = pPlayer->_SectorX;
 			WORD SectorY = pPlayer->_SectorY;
+
 			for (int i = 0; i < 3; i++) {
 				for (int j = 0; j < 3; j++) {
 					if (SectorX - 1 + i < 0)
@@ -320,6 +354,7 @@ void CChatServer::ReqMessage(CPacket* pPacket, INT64 SessionID) {
 					SendPacketSector(pSendPacket, SectorX - 1 + i, SectorY - 1 + j);
 				}
 			}
+
 			pSendPacket->Free();
 		}
 	}
@@ -418,7 +453,7 @@ INT64 CChatServer::GetMsgQueueCount() {
 
 void CChatServer::OnClientJoin(SOCKADDR_IN clientaddr, INT64 SessionID) {
 	st_UPDATE_MSG* updateMsg = _UpdateMsgPool.Alloc();
-	updateMsg->byType = dfJOIN;
+	updateMsg->byType = eJOIN;
 	updateMsg->pPacket = NULL;
 	updateMsg->SessionID = SessionID;
 	_MsgQueue.Enqueue(updateMsg);
@@ -428,7 +463,7 @@ void CChatServer::OnClientJoin(SOCKADDR_IN clientaddr, INT64 SessionID) {
 
 void CChatServer::OnClientLeave(INT64 SessionID) {
 	st_UPDATE_MSG* updateMsg = _UpdateMsgPool.Alloc();
-	updateMsg->byType = dfLEAVE;
+	updateMsg->byType = eLEAVE;
 	updateMsg->pPacket = NULL;
 	updateMsg->SessionID = SessionID;
 	_MsgQueue.Enqueue(updateMsg);
@@ -440,14 +475,11 @@ bool CChatServer::OnConnectRequest(SOCKADDR_IN clientaddr) {
 }
 
 void CChatServer::OnRecv(INT64 SessionID, CPacket* pRecvPacket) {
-	if (pRecvPacket->GetDataSize() < 2) {
-		Disconnect(SessionID);
-		return;
-	}
 	st_UPDATE_MSG* updateMsg = _UpdateMsgPool.Alloc();
-	updateMsg->byType = dfPACKET;
+	updateMsg->byType = ePACKET;
 	updateMsg->pPacket = pRecvPacket;
 	updateMsg->SessionID = SessionID;
+
 	pRecvPacket->AddRef();
 	_MsgQueue.Enqueue(updateMsg);
 	SetEvent(_hEvent);

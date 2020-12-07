@@ -22,27 +22,7 @@ using namespace std;
 
 
 class CNetServer {
-private:
-	//SRWLOCK srwINDEX;
-	stSESSION* _SessionList;
-	CLockfreeStack<int> _IndexSession;
-	//CLockfreeQueue<int> _IndexSession;
-	INT64 _SessionIDCnt;
-	SOCKET _Listen_sock;
-	HANDLE _hcp;
-	HANDLE* _hWorkerThread;
-	HANDLE _hAcceptThread;
-
-	int _MaxSession;
-	LONG _SessionCnt;
-	int _NumThread;
 public:
-	int _AcceptCount;
-	int _AcceptTPS;
-	volatile LONG _SendTPS;
-	volatile LONG _RecvTPS;
-	int _DisCount;
-
 	CNetServer();
 	static unsigned int WINAPI WorkerThreadFunc(LPVOID lParam) {
 		((CNetServer*)lParam)->WorkerThread(lParam);
@@ -53,38 +33,51 @@ public:
 		return 0;
 	}
 	unsigned int WINAPI WorkerThread(LPVOID lParam);
-
 	unsigned int WINAPI AcceptThread(LPVOID lParam);
-
 	bool Start(ULONG OpenIP, USHORT Port, int NumWorkerthread, int NumIOCP, int MaxSession, 
 		int iBlockNum = 100, bool bPlacementNew = false, bool Restart = false);
 	
 	void Stop();
 	int GetClientCount();
-	bool _Disconnect(stSESSION* pSession);
 	bool Disconnect(INT64 SessionID);
-	bool _SendPacket(stSESSION* pSession, CPacket* pSendPacket, int type = eNET);
 	bool SendPacket(INT64 SessionID, CPacket* pSendPacket, int type = eNET, bool post = false);
 	stSESSION* FindSession(INT64 SessionID);
-	void ReleaseSession(stSESSION* pSession);
+	//void DebugFunc(stSESSION* pSession, int FuncNum);
+	virtual void OnClientJoin(SOCKADDR_IN clientaddr, INT64 SessionID) = 0;
+	virtual void OnClientLeave(INT64 SessionID) = 0;
+	virtual bool OnConnectRequest(SOCKADDR_IN clientaddr) = 0;
+	virtual void OnRecv(INT64 SessionID, CPacket* pRecvPacket) = 0;
+	//virtual void OnSend(INT64 SessionID, int SendSize) = 0;
+	virtual void OnError(int errorcode, const WCHAR* Err) = 0;
 
+private:
+	void ReleaseSession(stSESSION* pSession);
 	void RecvPost(stSESSION* pSession);
 	void SendPost(stSESSION* pSession);
 	void Release(stSESSION* pSession);
+	bool _Disconnect(stSESSION* pSession);
+	bool _SendPacket(stSESSION* pSession, CPacket* pSendPacket, int type = eNET);
+	void RecvComp(stSESSION* pSession, DWORD cbTransferred);
+	void SendComp(stSESSION* pSession);
+	void AcceptSession(int curIdx, SOCKADDR_IN clientaddr, SOCKET client_sock);
 
-	//void DebugFunc(stSESSION* pSession, int FuncNum);
+public:
+	int _AcceptCount;
+	int _AcceptTPS;
+	volatile LONG _SendTPS;
+	volatile LONG _RecvTPS;
+	int _DisCount;
 
+private:
+	stSESSION* _SessionList;
+	CLockfreeStack<int> _IndexSession;
+	INT64 _SessionIDCnt;
+	SOCKET _Listen_sock;
+	HANDLE _hcp;
+	HANDLE* _hWorkerThread;
+	HANDLE _hAcceptThread;
 
-	
-
-	virtual void OnClientJoin(SOCKADDR_IN clientaddr, INT64 SessionID) = 0;
-	virtual void OnClientLeave(INT64 SessionID) = 0;
-
-	virtual bool OnConnectRequest(SOCKADDR_IN clientaddr) = 0;
-
-	virtual void OnRecv(INT64 SessionID, CPacket* pRecvPacket) = 0;
-	//virtual void OnSend(INT64 SessionID, int SendSize) = 0;
-
-	virtual void OnError(int errorcode, const WCHAR* Err) = 0;
-
+	int _MaxSession;
+	LONG _SessionCnt;
+	int _NumThread;
 };

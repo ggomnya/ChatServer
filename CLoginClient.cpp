@@ -40,11 +40,12 @@ void CLoginClient::OnRecv(INT64 SessionID, CPacket* pRecvPacket) {
 	WORD Type;
 	INT64 AccountNo;
 	INT64 Parameter;
-	*pRecvPacket >> Type >> AccountNo;
+	*pRecvPacket >> Type >> AccountNo >> Parameter;
 
 	if (Type != en_PACKET_SS_REQ_NEW_CLIENT_LOGIN) {
 		CCrashDump::Crash();
 	}
+
 	AcquireSRWLockExclusive(&_srwTOKEN);
 	st_TOKEN* pToken = FindToken(AccountNo);
 	//처음 온 Account인 경우
@@ -59,7 +60,7 @@ void CLoginClient::OnRecv(INT64 SessionID, CPacket* pRecvPacket) {
 		pToken->UpdateTime = timeGetTime();
 	}
 	ReleaseSRWLockExclusive(&_srwTOKEN);
-	*pRecvPacket >> Parameter;
+
 	CPacket* pSendPacket = CPacket::Alloc();
 	MPResNewClientLogin(pSendPacket, en_PACKET_SS_RES_NEW_CLIENT_LOGIN, AccountNo, Parameter);
 	SendPacket(pSendPacket);

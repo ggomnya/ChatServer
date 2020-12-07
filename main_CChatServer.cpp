@@ -24,38 +24,25 @@ WCHAR monitorClientIP[16];
 USHORT monitorClientPort;
 DWORD monitorClientThreadNum;
 DWORD monitorClientIOCPNum;
-
-
 INT64 PacketNum;
+
+bool ParseFunc();
 
 int wmain() {
 	timeBeginPeriod(1);
-	//Config 세팅
 	CProcessUsage ProcessUsage;
-	CINIParse Parse;
-	Parse.LoadFile(L"ChatServer_Config.ini");
-	Parse.GetValue(L"IP", ServerIP);
-	Parse.GetValue(L"PORT", (DWORD*)&ServerPort);
-	Parse.GetValue(L"THREAD_NUMBER", &ServerThreadNum);
-	Parse.GetValue(L"IOCP_NUMBER", &ServerIOCPNum);
-	Parse.GetValue(L"MAX_SESSION", &ServerMaxSession);
-
-	Parse.GetValue(L"IP", ClientIP);
-	Parse.GetValue(L"PORT", (DWORD*)&ClientPort);
-	Parse.GetValue(L"THREAD_NUMBER", &ClientThreadNum);
-	Parse.GetValue(L"IOCP_NUMBER", &ClientIOCPNum);
-
-	Parse.GetValue(L"IP", monitorClientIP);
-	Parse.GetValue(L"PORT", (DWORD*)&monitorClientPort);
-	Parse.GetValue(L"THREAD_NUMBER", &monitorClientThreadNum);
-	Parse.GetValue(L"IOCP_NUMBER", &monitorClientIOCPNum);
-
+	//Config 세팅
+	if (!ParseFunc()) {
+		wprintf(L"Parse Error\n");
+		return -1;
+	}
 
 	CChatServer* server = new CChatServer;
 	CMonitoringLanClient* monitorClient = new CMonitoringLanClient;
 	server->Start(INADDR_ANY, ServerPort, ServerThreadNum, ServerIOCPNum, ServerMaxSession, false);
 	server->_LoginClient.Start(ClientIP, ClientPort, ClientThreadNum, ClientIOCPNum);
 	monitorClient->Start(monitorClientIP, monitorClientPort, monitorClientThreadNum, monitorClientIOCPNum);
+
 	while (1) {
 	//1초마다 List 현황 출력
 		wprintf(L"================ChatServer====================\n");
@@ -113,11 +100,77 @@ int wmain() {
 		server->_MsgTPS = 0;
 		server->_LoginClient._RecvTPS = 0;
 		server->_LoginClient._SendTPS = 0;
+
 		if (_kbhit()) {
 			WCHAR cmd = _getch();
 			if (cmd == L'q' || cmd == L'Q')
 				CCrashDump::Crash();
 		}
+
 		Sleep(999);
 	}
+}
+
+bool ParseFunc() {
+	CINIParse Parse;
+	if (!Parse.LoadFile(L"ChatServer_Config.ini")) {
+		wprintf(L"LoadFile error\n");
+		return false;
+	}
+	if (!Parse.GetValue(L"IP", ServerIP)) {
+		wprintf(L"ServerIP error\n");
+		return false;
+	}
+	if (!Parse.GetValue(L"PORT", (DWORD*)&ServerPort)) {
+		wprintf(L"ServerPort error\n");
+		return false;
+	}
+	if (!Parse.GetValue(L"THREAD_NUMBER", &ServerThreadNum)) {
+		wprintf(L"ServerThreadNum error\n");
+		return false;
+	}
+	if (!Parse.GetValue(L"IOCP_NUMBER", &ServerIOCPNum)) {
+		wprintf(L"ServerIOCPNum error\n");
+		return false;
+	}
+	if (!Parse.GetValue(L"MAX_SESSION", &ServerMaxSession)) {
+		wprintf(L"ServerMaxSession error\n");
+		return false;
+	}
+
+	if (!Parse.GetValue(L"IP", ClientIP)) {
+		wprintf(L"ClientIP error\n");
+		return false;
+	}
+	if (!Parse.GetValue(L"PORT", (DWORD*)&ClientPort)) {
+		wprintf(L"ClientPort error\n");
+		return false;
+	}
+	if (!Parse.GetValue(L"THREAD_NUMBER", &ClientThreadNum)) {
+		wprintf(L"ClientThreadNum error\n");
+		return false;
+	}
+	if (!Parse.GetValue(L"IOCP_NUMBER", &ClientIOCPNum)) {
+		wprintf(L"ClientIOCPNum error\n");
+		return false;
+	}
+
+	if (!Parse.GetValue(L"IP", monitorClientIP)) {
+		wprintf(L"monitorClientIP error\n");
+		return false;
+	}
+	if (!Parse.GetValue(L"PORT", (DWORD*)&monitorClientPort)) {
+		wprintf(L"monitorClientPort error\n");
+		return false;
+	}
+	if (!Parse.GetValue(L"THREAD_NUMBER", &monitorClientThreadNum)) {
+		wprintf(L"monitorClientThreadNum error\n");
+		return false;
+	}
+	if (!Parse.GetValue(L"IOCP_NUMBER", &monitorClientIOCPNum)) {
+		wprintf(L"monitorClientIOCPNum error\n");
+		return false;
+	}
+	
+	return true;
 }

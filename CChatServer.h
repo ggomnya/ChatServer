@@ -7,29 +7,7 @@
 using namespace std;
 
 class CChatServer : public CNetServer {
-private:
-#define dfJOIN		0
-#define dfPACKET	1
-#define dfLEAVE		2
-#define dfHEARTBEAT	40
-
-	DWORD _dwHeartbeatTime;
-	DWORD _dwTokenTime;
-	HANDLE _hUpdateThread;
-	HANDLE _hEvent;
-	CObjectPool<st_UPDATE_MSG> _UpdateMsgPool;
-	CLockfreeQueue<st_UPDATE_MSG*> _MsgQueue;
-	CObjectPool<CPlayer> _PlayerPool;
-	list<CPlayer*> _Sector[100][100];
-	unordered_map<INT64, CPlayer*> _PlayerMap;
-
 public:
-	CLoginClient _LoginClient;
-	INT64 _HeartbeatDis;
-	INT64 _MsgTPS;
-	INT64 _BlockCount;
-	INT64 _SessionNotFound;
-	INT64 _SessionMiss;
 	CChatServer();
 	static unsigned int WINAPI UpdateThreadFunc(LPVOID lParam) {
 		((CChatServer*)lParam)->UpdateThread(lParam);
@@ -38,7 +16,9 @@ public:
 	unsigned int WINAPI UpdateThread(LPVOID lParam);
 
 	void JoinMSG(INT64 SessionID);
+	void PacketMSG(st_UPDATE_MSG* updateMsg);
 	void LeaveMSG(INT64 SessionID);
+	void MsgProc(st_UPDATE_MSG* updateMsg);
 
 	void CheckHeartbeat();
 	void CheckToken();
@@ -74,4 +54,26 @@ public:
 	virtual void OnRecv(INT64 SessionID, CPacket* pRecvPacket);
 	//virtual void OnSend(INT64 SessionID, int SendSize) = 0;
 	virtual void OnError(int errorcode, const WCHAR* Err);
+
+private:
+	enum {eJOIN, ePACKET, eLEAVE};
+	DWORD _dwHeartbeatTime;
+	DWORD _dwTokenTime;
+	HANDLE _hUpdateThread;
+	HANDLE _hEvent;
+	CObjectPool<st_UPDATE_MSG> _UpdateMsgPool;
+	CLockfreeQueue<st_UPDATE_MSG*> _MsgQueue;
+	CObjectPool<CPlayer> _PlayerPool;
+	list<CPlayer*> _Sector[100][100];
+	unordered_map<INT64, CPlayer*> _PlayerMap;
+
+public:
+	CLoginClient _LoginClient;
+	INT64 _HeartbeatDis;
+	INT64 _MsgTPS;
+	INT64 _BlockCount;
+	INT64 _SessionNotFound;
+	INT64 _SessionMiss;
+
+
 };

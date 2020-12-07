@@ -9,7 +9,6 @@ void CMonitoringLanClient::MPMonitorDataUpdate(CPacket* pPacket, WORD Type, BYTE
 }
 
 void CMonitoringLanClient::TransferData(BYTE DataType, int DataValue, int TimeStamp) {
-
 	if (DataType == dfMONITOR_DATA_TYPE_CHAT_SERVER_MEM) {
 		PDH_FMT_COUNTERVALUE counterVal;
 		PdhCollectQueryData(_processMemQuery);
@@ -17,6 +16,7 @@ void CMonitoringLanClient::TransferData(BYTE DataType, int DataValue, int TimeSt
 		DataValue = (counterVal.largeValue / (1000 * 1000));
 
 	}
+
 	CPacket* pSendPacket = CPacket::Alloc();
 	MPMonitorDataUpdate(pSendPacket, en_PACKET_SS_MONITOR_DATA_UPDATE, DataType, DataValue, TimeStamp);
 	SendPacket(pSendPacket);
@@ -30,6 +30,7 @@ void CMonitoringLanClient::OnEnterJoinServer(INT64 SessionID) {
 	SendPacket(pSendPacket);
 	pSendPacket->Free();
 }
+
 void CMonitoringLanClient::OnLeaveServer(INT64 SessionID) {
 	ReConnect();
 }

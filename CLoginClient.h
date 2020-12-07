@@ -6,12 +6,6 @@ using namespace std;
 //key - AccountNo, value - ¿Œ¡ı Token
 
 class CLoginClient : public CLanClient {
-private:
-	friend class CChatServer;
-	static SRWLOCK _srwTOKEN;
-	static CObjectPool<st_TOKEN> _TokenPool;
-	static unordered_map<INT64, st_TOKEN*> _TokenMap;
-
 public:
 	CLoginClient();
 	void MPLoginServerLogin(CPacket* pPacket, WORD Type, BYTE ServerType, WCHAR* ServerName);
@@ -36,10 +30,14 @@ public:
 	
 	virtual void OnEnterJoinServer(INT64 SessionID);
 	virtual void OnLeaveServer(INT64 SessionID);
-
 	virtual void OnRecv(INT64 SessionID, CPacket* pRecvPacket);
 	//virtual void OnSend(INT64 SessionID, int SendSize) = 0;
-
 	virtual void OnError(int errorcode, const WCHAR* Err);
+
+private:
+	friend class CChatServer;
+	static SRWLOCK _srwTOKEN;
+	static CObjectPool<st_TOKEN> _TokenPool;
+	static unordered_map<INT64, st_TOKEN*> _TokenMap;
 
 };

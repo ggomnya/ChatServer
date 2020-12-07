@@ -108,9 +108,11 @@ int CPacket::MoveReadPos(int iSize) {
 
 int CPacket::GetData(char* chpDest, int iSize) {
 	int iTempSize = iSize;
-	/*if (_iDataSize < iTempSize) {
-		iTempSize = _iDataSize;
-	}*/
+	if (_iRear - _iFront < iTempSize) {
+		CPacket::EX* err = new CPacket::EX(_iBufferSize);
+		memcpy_s(err->_Buffer, _iRear - _iFront, _Buffer + _iFront, _iRear - _iFront);
+		throw(err);
+	}
 	memcpy_s(chpDest, iTempSize, _Buffer + _iFront, iTempSize);
 	_iFront += iTempSize;
 	//_iDataSize -= iTempSize;
@@ -118,9 +120,11 @@ int CPacket::GetData(char* chpDest, int iSize) {
 }
 int CPacket::PutData(char* chpSrc, int iSrcSize) {
 	int iTempSize = iSrcSize;
-	/*if (_iBufferSize - _iRear < iTempSize) {
-		iTempSize = _iBufferSize - _iRear;
-	}*/
+	if (_iBufferSize - _iRear < iTempSize) {
+		CPacket::EX* err = new CPacket::EX(_iBufferSize);
+		memcpy_s(err->_Buffer, _iRear - _iFront, _Buffer + _iFront, _iRear - _iFront);
+		throw(err);
+	}
 	memcpy_s(_Buffer + _iRear, iTempSize, chpSrc, iTempSize);
 	_iRear += iTempSize;
 	//_iDataSize += iTempSize;
@@ -204,11 +208,11 @@ void CPacket::Decode() {
 
 CPacket& CPacket::operator << (BYTE byValue) {
 	int iTempSize = sizeof(BYTE);
-	/*if (_iBufferSize - _iRear < iTempSize) {
+	if (_iBufferSize - _iRear < iTempSize) {
 		CPacket::EX* err = new CPacket::EX(_iBufferSize);
-		memcpy_s(err->_Buffer, _iDataSize, _Buffer + _iFront, _iDataSize);
+		memcpy_s(err->_Buffer, _iRear - _iFront, _Buffer + _iFront, _iRear - _iFront);
 		throw(err);
-	}*/
+	}
 	memcpy_s(_Buffer + _iRear, iTempSize, &byValue, iTempSize);
 	_iRear += iTempSize;
 	//_iDataSize += iTempSize;
@@ -218,11 +222,11 @@ CPacket& CPacket::operator << (BYTE byValue) {
 }
 CPacket& CPacket::operator << (char chValue) {
 	int iTempSize = sizeof(char);
-	/*if (_iBufferSize - _iRear < iTempSize) {
+	if (_iBufferSize - _iRear < iTempSize) {
 		CPacket::EX* err = new CPacket::EX(_iBufferSize);
-		memcpy_s(err->_Buffer, _iDataSize, _Buffer + _iFront, _iDataSize);
+		memcpy_s(err->_Buffer, _iRear - _iFront, _Buffer + _iFront, _iRear - _iFront);
 		throw(err);
-	}*/
+	}
 	memcpy_s(_Buffer + _iRear, iTempSize, &chValue, iTempSize);
 	_iRear += iTempSize;
 	//_iDataSize += iTempSize;
@@ -231,11 +235,11 @@ CPacket& CPacket::operator << (char chValue) {
 
 CPacket& CPacket::operator << (short shValue) {
 	int iTempSize = sizeof(short);
-	/*if (_iBufferSize - _iRear < iTempSize) {
+	if (_iBufferSize - _iRear < iTempSize) {
 		CPacket::EX* err = new CPacket::EX(_iBufferSize);
-		memcpy_s(err->_Buffer, _iDataSize, _Buffer + _iFront, _iDataSize);
+		memcpy_s(err->_Buffer, _iRear - _iFront, _Buffer + _iFront, _iRear - _iFront);
 		throw(err);
-	}*/
+	}
 	memcpy_s(_Buffer + _iRear, iTempSize, &shValue, iTempSize);
 	_iRear += iTempSize;
 	//_iDataSize += iTempSize;
@@ -243,11 +247,11 @@ CPacket& CPacket::operator << (short shValue) {
 }
 CPacket& CPacket::operator << (WORD wValue) {
 	int iTempSize = sizeof(WORD);
-	/*if (_iBufferSize - _iRear < iTempSize) {
+	if (_iBufferSize - _iRear < iTempSize) {
 		CPacket::EX* err = new CPacket::EX(_iBufferSize);
-		memcpy_s(err->_Buffer, _iDataSize, _Buffer + _iFront, _iDataSize);
+		memcpy_s(err->_Buffer, _iRear - _iFront, _Buffer + _iFront, _iRear - _iFront);
 		throw(err);
-	}*/
+	}
 	memcpy_s(_Buffer + _iRear, iTempSize, &wValue, iTempSize);
 	_iRear += iTempSize;
 	//_iDataSize += iTempSize;
@@ -256,11 +260,11 @@ CPacket& CPacket::operator << (WORD wValue) {
 
 CPacket& CPacket::operator << (int iValue) {
 	int iTempSize = sizeof(int);
-	/*if (_iBufferSize - _iRear < iTempSize) {
+	if (_iBufferSize - _iRear < iTempSize) {
 		CPacket::EX* err = new CPacket::EX(_iBufferSize);
-		memcpy_s(err->_Buffer, _iDataSize, _Buffer + _iFront, _iDataSize);
+		memcpy_s(err->_Buffer, _iRear - _iFront, _Buffer + _iFront, _iRear - _iFront);
 		throw(err);
-	}*/
+	}
 	memcpy_s(_Buffer + _iRear, iTempSize, &iValue, iTempSize);
 	_iRear += iTempSize;
 	//_iDataSize += iTempSize;
@@ -268,11 +272,11 @@ CPacket& CPacket::operator << (int iValue) {
 }
 CPacket& CPacket::operator << (DWORD dwValue) {
 	int iTempSize = sizeof(DWORD);
-	/*if (_iBufferSize - _iRear < iTempSize) {
+	if (_iBufferSize - _iRear < iTempSize) {
 		CPacket::EX* err = new CPacket::EX(_iBufferSize);
-		memcpy_s(err->_Buffer, _iDataSize, _Buffer + _iFront, _iDataSize);
+		memcpy_s(err->_Buffer, _iRear - _iFront, _Buffer + _iFront, _iRear - _iFront);
 		throw(err);
-	}*/
+	}
 	memcpy_s(_Buffer + _iRear, iTempSize, &dwValue, iTempSize);
 	_iRear += iTempSize;
 	//_iDataSize += iTempSize;
@@ -280,11 +284,11 @@ CPacket& CPacket::operator << (DWORD dwValue) {
 }
 CPacket& CPacket::operator << (float fValue) {
 	int iTempSize = sizeof(float);
-	//if (_iBufferSize - _iRear < iTempSize) {
-	//	CPacket::EX* err = new CPacket::EX(_iBufferSize);
-	//	memcpy_s(err->_Buffer, _iDataSize, _Buffer + _iFront, _iDataSize);
-	//	throw(err);
-	//}
+	if (_iBufferSize - _iRear < iTempSize) {
+		CPacket::EX* err = new CPacket::EX(_iBufferSize);
+		memcpy_s(err->_Buffer, _iRear - _iFront, _Buffer + _iFront, _iRear - _iFront);
+		throw(err);
+	}
 	memcpy_s(_Buffer + _iRear, iTempSize, &fValue, iTempSize);
 	_iRear += iTempSize;
 	//_iDataSize += iTempSize;
@@ -293,11 +297,11 @@ CPacket& CPacket::operator << (float fValue) {
 
 CPacket& CPacket::operator << (__int64 iValue) {
 	int iTempSize = sizeof(__int64);
-	/*if (_iBufferSize - _iRear < iTempSize) {
+	if (_iBufferSize - _iRear < iTempSize) {
 		CPacket::EX* err = new CPacket::EX(_iBufferSize);
-		memcpy_s(err->_Buffer, _iDataSize, _Buffer + _iFront, _iDataSize);
+		memcpy_s(err->_Buffer, _iRear - _iFront, _Buffer + _iFront, _iRear - _iFront);
 		throw(err);
-	}*/
+	}
 	memcpy_s(_Buffer + _iRear, iTempSize, &iValue, iTempSize);
 	_iRear += iTempSize;
 	//_iDataSize += iTempSize;
@@ -305,11 +309,11 @@ CPacket& CPacket::operator << (__int64 iValue) {
 }
 CPacket& CPacket::operator << (double dValue) {
 	int iTempSize = sizeof(double);
-	/*if (_iBufferSize - _iRear < iTempSize) {
+	if (_iBufferSize - _iRear < iTempSize) {
 		CPacket::EX* err = new CPacket::EX(_iBufferSize);
-		memcpy_s(err->_Buffer, _iDataSize, _Buffer + _iFront, _iDataSize);
+		memcpy_s(err->_Buffer, _iRear - _iFront, _Buffer + _iFront, _iRear - _iFront);
 		throw(err);
-	}*/
+	}
 	memcpy_s(_Buffer + _iRear, iTempSize, &dValue, iTempSize);
 	_iRear += iTempSize;
 	//_iDataSize += iTempSize;
@@ -318,11 +322,11 @@ CPacket& CPacket::operator << (double dValue) {
 
 CPacket& CPacket::operator << (UINT uiValue) {
 	int iTempSize = sizeof(UINT);
-	/*if (_iBufferSize - _iRear < iTempSize) {
+	if (_iBufferSize - _iRear < iTempSize) {
 		CPacket::EX* err = new CPacket::EX(_iBufferSize);
-		memcpy_s(err->_Buffer, _iDataSize, _Buffer + _iFront, _iDataSize);
+		memcpy_s(err->_Buffer, _iRear - _iFront, _Buffer + _iFront, _iRear - _iFront);
 		throw(err);
-	}*/
+	}
 	memcpy_s(_Buffer + _iRear, iTempSize, &uiValue, iTempSize);
 	_iRear += iTempSize;
 	//_iDataSize += iTempSize;
@@ -331,11 +335,11 @@ CPacket& CPacket::operator << (UINT uiValue) {
 
 CPacket& CPacket::operator << (UINT64 ullValue) {
 	int iTempSize = sizeof(UINT64);
-	/*if (_iBufferSize - _iRear < iTempSize) {
+	if (_iBufferSize - _iRear < iTempSize) {
 		CPacket::EX* err = new CPacket::EX(_iBufferSize);
-		memcpy_s(err->_Buffer, _iDataSize, _Buffer + _iFront, _iDataSize);
+		memcpy_s(err->_Buffer, _iRear - _iFront, _Buffer + _iFront, _iRear - _iFront);
 		throw(err);
-	}*/
+	}
 	memcpy_s(_Buffer + _iRear, iTempSize, &ullValue, iTempSize);
 	_iRear += iTempSize;
 	//_iDataSize += iTempSize;
@@ -344,11 +348,11 @@ CPacket& CPacket::operator << (UINT64 ullValue) {
 
 CPacket& CPacket::operator >> (BYTE& byValue) {
 	int iTempSize = sizeof(BYTE);
-	/*if (_iDataSize < iTempSize) {
+	if (_iRear - _iFront < iTempSize) {
 		CPacket::EX* err = new CPacket::EX(_iBufferSize);
-		memcpy_s(err->_Buffer, _iDataSize, _Buffer + _iFront, _iDataSize);
+		memcpy_s(err->_Buffer, _iRear - _iFront, _Buffer + _iFront, _iRear - _iFront);
 		throw(err);
-	}*/
+	}
 	memcpy_s(&byValue, iTempSize, _Buffer + _iFront, iTempSize);
 	_iFront += iTempSize;
 	//_iDataSize -= iTempSize;
@@ -356,11 +360,11 @@ CPacket& CPacket::operator >> (BYTE& byValue) {
 }
 CPacket& CPacket::operator >> (char& chValue) {
 	int iTempSize = sizeof(char);
-	/*if (_iDataSize < iTempSize) {
+	if (_iRear - _iFront < iTempSize) {
 		CPacket::EX* err = new CPacket::EX(_iBufferSize);
-		memcpy_s(err->_Buffer, _iDataSize, _Buffer + _iFront, _iDataSize);
+		memcpy_s(err->_Buffer, _iRear - _iFront, _Buffer + _iFront, _iRear - _iFront);
 		throw(err);
-	}*/
+	}
 	memcpy_s(&chValue, iTempSize, _Buffer + _iFront, iTempSize);
 	_iFront += iTempSize;
 	//_iDataSize -= iTempSize;
@@ -369,11 +373,11 @@ CPacket& CPacket::operator >> (char& chValue) {
 
 CPacket& CPacket::operator >> (short& shValue) {
 	int iTempSize = sizeof(short);
-	/*if (_iDataSize < iTempSize) {
+	if (_iRear - _iFront < iTempSize) {
 		CPacket::EX* err = new CPacket::EX(_iBufferSize);
-		memcpy_s(err->_Buffer, _iDataSize, _Buffer + _iFront, _iDataSize);
+		memcpy_s(err->_Buffer, _iRear - _iFront, _Buffer + _iFront, _iRear - _iFront);
 		throw(err);
-	}*/
+	}
 	memcpy_s(&shValue, iTempSize, _Buffer + _iFront, iTempSize);
 	_iFront += iTempSize;
 	//_iDataSize -= iTempSize;
@@ -381,11 +385,11 @@ CPacket& CPacket::operator >> (short& shValue) {
 }
 CPacket& CPacket::operator >> (WORD& wValue) {
 	int iTempSize = sizeof(WORD);
-	/*if (_iDataSize < iTempSize) {
+	if (_iRear - _iFront < iTempSize) {
 		CPacket::EX* err = new CPacket::EX(_iBufferSize);
-		memcpy_s(err->_Buffer, _iDataSize, _Buffer + _iFront, _iDataSize);
+		memcpy_s(err->_Buffer, _iRear - _iFront, _Buffer + _iFront, _iRear - _iFront);
 		throw(err);
-	}*/
+	}
 	memcpy_s(&wValue, iTempSize, _Buffer + _iFront, iTempSize);
 	_iFront += iTempSize;
 	//_iDataSize -= iTempSize;
@@ -394,11 +398,11 @@ CPacket& CPacket::operator >> (WORD& wValue) {
 
 CPacket& CPacket::operator >> (int& iValue) {
 	int iTempSize = sizeof(int);
-	/*if (_iDataSize < iTempSize) {
+	if (_iRear - _iFront < iTempSize) {
 		CPacket::EX* err = new CPacket::EX(_iBufferSize);
-		memcpy_s(err->_Buffer, _iDataSize, _Buffer + _iFront, _iDataSize);
+		memcpy_s(err->_Buffer, _iRear - _iFront, _Buffer + _iFront, _iRear - _iFront);
 		throw(err);
-	}*/
+	}
 	memcpy_s(&iValue, iTempSize, _Buffer + _iFront, iTempSize);
 	_iFront += iTempSize;
 	//_iDataSize -= iTempSize;
@@ -406,11 +410,11 @@ CPacket& CPacket::operator >> (int& iValue) {
 }
 CPacket& CPacket::operator >> (DWORD& dwValue) {
 	int iTempSize = sizeof(DWORD);
-	/*if (_iDataSize < iTempSize) {
+	if (_iRear - _iFront < iTempSize) {
 		CPacket::EX* err = new CPacket::EX(_iBufferSize);
-		memcpy_s(err->_Buffer, _iDataSize, _Buffer + _iFront, _iDataSize);
+		memcpy_s(err->_Buffer, _iRear - _iFront, _Buffer + _iFront, _iRear - _iFront);
 		throw(err);
-	}*/
+	}
 	memcpy_s(&dwValue, iTempSize, _Buffer + _iFront, iTempSize);
 	_iFront += iTempSize;
 	//_iDataSize -= iTempSize;
@@ -418,11 +422,11 @@ CPacket& CPacket::operator >> (DWORD& dwValue) {
 }
 CPacket& CPacket::operator >> (float& fValue) {
 	int iTempSize = sizeof(float);
-	/*if (_iDataSize < iTempSize) {
+	if (_iRear - _iFront < iTempSize) {
 		CPacket::EX* err = new CPacket::EX(_iBufferSize);
-		memcpy_s(err->_Buffer, _iDataSize, _Buffer + _iFront, _iDataSize);
+		memcpy_s(err->_Buffer, _iRear - _iFront, _Buffer + _iFront, _iRear - _iFront);
 		throw(err);
-	}*/
+	}
 	memcpy_s(&fValue, iTempSize, _Buffer + _iFront, iTempSize);
 	_iFront += iTempSize;
 	//_iDataSize -= iTempSize;
@@ -431,11 +435,11 @@ CPacket& CPacket::operator >> (float& fValue) {
 
 CPacket& CPacket::operator >> (__int64& iValue) {
 	int iTempSize = sizeof(__int64);
-	/*if (_iDataSize < iTempSize) {
+	if (_iRear - _iFront < iTempSize) {
 		CPacket::EX* err = new CPacket::EX(_iBufferSize);
-		memcpy_s(err->_Buffer, _iDataSize, _Buffer + _iFront, _iDataSize);
+		memcpy_s(err->_Buffer, _iRear - _iFront, _Buffer + _iFront, _iRear - _iFront);
 		throw(err);
-	}*/
+	}
 	memcpy_s(&iValue, iTempSize, _Buffer + _iFront, iTempSize);
 	_iFront += iTempSize;
 	//_iDataSize -= iTempSize;
@@ -443,11 +447,11 @@ CPacket& CPacket::operator >> (__int64& iValue) {
 }
 CPacket& CPacket::operator >> (double& dValue) {
 	int iTempSize = sizeof(double);
-	/*if (_iDataSize < iTempSize) {
+	if (_iRear - _iFront < iTempSize) {
 		CPacket::EX* err = new CPacket::EX(_iBufferSize);
-		memcpy_s(err->_Buffer, _iDataSize, _Buffer + _iFront, _iDataSize);
+		memcpy_s(err->_Buffer, _iRear - _iFront, _Buffer + _iFront, _iRear - _iFront);
 		throw(err);
-	}*/
+	}
 	memcpy_s(&dValue, iTempSize, _Buffer + _iFront, iTempSize);
 	_iFront += iTempSize;
 	//_iDataSize -= iTempSize;
@@ -456,11 +460,11 @@ CPacket& CPacket::operator >> (double& dValue) {
 
 CPacket& CPacket::operator >> (UINT& uiValue) {
 	int iTempSize = sizeof(UINT);
-	/*if (_iDataSize < iTempSize) {
+	if (_iRear - _iFront < iTempSize) {
 		CPacket::EX* err = new CPacket::EX(_iBufferSize);
-		memcpy_s(err->_Buffer, _iDataSize, _Buffer + _iFront, _iDataSize);
+		memcpy_s(err->_Buffer, _iRear - _iFront, _Buffer + _iFront, _iRear - _iFront);
 		throw(err);
-	}*/
+	}
 	memcpy_s(&uiValue, iTempSize, _Buffer + _iFront, iTempSize);
 	_iFront += iTempSize;
 	//_iDataSize -= iTempSize;
@@ -469,11 +473,11 @@ CPacket& CPacket::operator >> (UINT& uiValue) {
 
 CPacket& CPacket::operator >> (UINT64& ullValue) {
 	int iTempSize = sizeof(UINT64);
-	/*if (_iDataSize < iTempSize) {
+	if (_iRear - _iFront < iTempSize) {
 		CPacket::EX* err = new CPacket::EX(_iBufferSize);
-		memcpy_s(err->_Buffer, _iDataSize, _Buffer + _iFront, _iDataSize);
+		memcpy_s(err->_Buffer, _iRear - _iFront, _Buffer + _iFront, _iRear - _iFront);
 		throw(err);
-	}*/
+	}
 	memcpy_s(&ullValue, iTempSize, _Buffer + _iFront, iTempSize);
 	_iFront += iTempSize;
 	//_iDataSize -= iTempSize;
